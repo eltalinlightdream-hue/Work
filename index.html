@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="My Classes"/>
+<meta name="theme-color" content="#FFD600"/>
+<link rel="manifest" href="/manifest.json"/>
+<title>My Classes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#F5F5F5;font-family:'Segoe UI',system-ui,sans-serif;color:#111;-webkit-tap-highlight-color:transparent;}
+  input,select,textarea,button{font-family:inherit;}
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-track{background:#eee;}
+  ::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
+}
+const SAVE_KEY="myClassesData_v3";
+function saveData(data){ const s=JSON.stringify(data); try{localStorage.setItem(SAVE_KEY,s);}catch(e){} try{sessionStorage.setItem(SAVE_KEY,s);}catch(e){} }
+function loadData(){ try{ const d=localStorage.getItem(SAVE_KEY)||sessionStorage.getItem(SAVE_KEY); if(d){const p=JSON.parse(d);if(Array.isArray(p)&&p.length)return p;} }catch(e){} return null; }
+window._saveData=saveData; window._loadData=loadData;
+</script>
+<script type="text/babel">
+const{useState,useMemo,useEffect,useCallback,useRef}=React;
+
+const fmt=(n)=>new Intl.NumberFormat("uz-UZ").format(Math.round(n||0))+" so'm";
+const fmtShort=(n)=>(n>=1000000?(n/1000000).toFixed(1)+"M":(n>=1000?(n/1000).toFixed(0)+"K":String(n)));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const NOW_MONTH=new Date().getMonth();
+const NOW_YEAR=new Date().getFullYear();
+const TEACHER_PCT=55;
+
+// Colors — white/yellow/black theme
+const Y="#FFD600", YD="#E6C000", BG="#F5F5F5", BG2="#FFFFFF", BG3="#EEEEEE";
+const TXT="#111111", G1="#666666", G2="#DDDDDD";
+
+const makeStudent=(name="")=>({
+  id:uid(), name,
+  payments:[{id:uid(),label:"Main payment",amount:370000,paid:false}]
+});
+
+// ── Real March data ──
+const MARCH_DATA=[{"id":"cd8fcec","name":"Even 13:00","month":2,"year":2026,"students":[{"id":"15a4bc7","name":"elbek","payments":[{"id":"1deba91","label":"Main payment","amount":0,"paid":false}]},{"id":"22bf312","name":"Doniyor","payments":[{"id":"ae03fc8","label":"Main payment","amount":0,"paid":false}]},{"id":"93a1aef","name":"Myusuf","payments":[{"id":"6633311","label":"Main payment","amount":0,"paid":false}]},{"id":"438d7d2","name":"afzalbek","payments":[{"id":"a03c682","label":"Main payment","amount":0,"paid":false},{"id":"3188251","label":"Extra payment","amount":370000,"paid":true}]},{"id":"0a66868","name":"mumtozabegim","payments":[{"id":"aac40a6","label":"Main payment","amount":370000,"paid":true}]},{"id":"5fca87d","name":"samira","payments":[{"id":"700b313","label":"Main payment","amount":240000,"paid":true},{"id":"926bd8e","label":"Extra payment","amount":80000,"paid":true}]},{"id":"16f5eba","name":"muhammadbilol","payments":[{"id":"f8c6fb6","label":"Main payment","amount":370000,"paid":true}]},{"id":"4bb9de7","name":"yolchibek","payments":[{"id":"f4eaba5","label":"Main payment","amount":0,"paid":false}]},{"id":"344b59a","name":"yodgorbek","payments":[{"id":"6914c05","label":"Main payment","amount":0,"paid":false}]}]},{"id":"6ed590f","name":"Even 15:00","month":2,"year":2026,"students":[{"id":"9459e97","name":"Islombek","payments":[{"id":"ed746a4","label":"Main payment","amount":350000,"paid":true}]},{"id":"c2279c2","name":"Iqboljon","payments":[{"id":"4ec51dc","label":"Main payment","amount":370000,"paid":true}]},{"id":"98938f3","name":"iqboljon jr","payments":[{"id":"3352bda","label":"Main payment","amount":370000,"paid":true}]},{"id":"75a1df4","name":"miraziz","payments":[{"id":"582323a","label":"Main payment","amount":0,"paid":false}]},{"id":"7ebe862","name":"munavvarhon","payments":[{"id":"01189c7","label":"Main payment","amount":370000,"paid":true}]},{"id":"812a28f","name":"pariozda","payments":[{"id":"171f69e","label":"Main payment","amount":0,"paid":false}]},{"id":"ca1b649","name":"shaxzoda","payments":[{"id":"f60366b","label":"Main payment","amount":0,"paid":false}]},{"id":"74939c3","name":"gulhayo","payments":[{"id":"94cae78","label":"Main payment","amount":370000,"paid":true}]},{"id":"43b0639","name":"homidjon","payments":[{"id":"7abd810","label":"Main payment","amount":0,"paid":false}]},{"id":"08b9cef","name":"abdulaziz","payments":[{"id":"1188334","label":"Main payment","amount":370000,"paid":true}]},{"id":"c852f65","name":"botirjon","payments":[{"id":"dd3143c","label":"Main payment","amount":370000,"paid":true}]},{"id":"a1a45b5","name":"Robiya","payments":[{"id":"a711590","label":"Main payment","amount":370000,"paid":true}]}]},{"id":"fc6d343","name":"Odd 13:00","month":2,"year":2026,"students":[{"id":"a527deb","name":"shukrona","payments":[{"id":"367e294","label":"Main payment","amount":0,"paid":false}]},{"id":"1cc75fc","name":"ozodbek","payments":[{"id":"c5aff31","label":"Main payment","amount":370000,"paid":true}]},{"id":"33e0562","name":"dilyora","payments":[{"id":"6e9a2b7","label":"Main payment","amount":370000,"paid":true}]},{"id":"6d9647f","name":"sardor","payments":[{"id":"5b7b05c","label":"Main payment","amount":370000,"paid":true}]},{"id":"f84295d","name":"sardor jr","payments":[{"id":"09b51c3","label":"Main payment","amount":0,"paid":false}]},{"id":"1897e12","name":"gulchiroy","payments":[{"id":"9dbd8c1","label":"Main payment","amount":370000,"paid":true}]},{"id":"bc88f7b","name":"zilola","payments":[{"id":"58d0cf9","label":"Main payment","amount":0,"paid":false}]},{"id":"2f21f1c","name":"xusnora","payments":[{"id":"b0f0dc8","label":"Main payment","amount":370000,"paid":true}]},{"id":"faf6216","name":"mahliyo","payments":[{"id":"af6a211","label":"Main payment","amount":0,"paid":false}]},{"id":"cdf714c","name":"otkirbek","payments":[{"id":"134e41d","label":"Main payment","amount":370000,"paid":true}]}]},{"id":"80c75e1","name":"Odd 15:00","month":2,"year":2026,"students":[{"id":"26f46d9","name":"abdulfayiz","payments":[{"id":"00bb431","label":"Main payment","amount":300000,"paid":true}]},{"id":"f9c3e45","name":"jahongir","payments":[{"id":"a5656a9","label":"Main payment","amount":0,"paid":false}]},{"id":"22857e1","name":"asadbek","payments":[{"id":"97f9aa4","label":"Main payment","amount":0,"paid":false}]},{"id":"ec5ab2a","name":"iqboljon","payments":[{"id":"aab7d18","label":"Main payment","amount":0,"paid":false}]},{"id":"33d29bc","name":"sohibjon","payments":[{"id":"46348bd","label":"Main payment","amount":370000,"paid":true}]},{"id":"c2e6bfd","name":"durdona","payments":[{"id":"c2feb07","label":"Main payment","amount":0,"paid":false}]},{"id":"f05bd31","name":"shaxlo","payments":[{"id":"e49a6b0","label":"Main payment","amount":370000,"paid":true}]},{"id":"4382328","name":"robiya","payments":[{"id":"047f11d","label":"Main payment","amount":0,"paid":false}]},{"id":"0c34595","name":"hurshidbek","payments":[{"id":"5eacf34","label":"Main payment","amount":0,"paid":false}]},{"id":"291b475","name":"moxichehra","payments":[{"id":"4e788db","label":"Main payment","amount":0,"paid":false}]},{"id":"ece29bf","name":"fotima","payments":[{"id":"3c0b47e","label":"Main payment","amount":340000,"paid":true}]},{"id":"70ec8f4","name":"zuhra","payments":[{"id":"9bd2113","label":"Main payment","amount":340000,"paid":true}]}]},{"id":"e6911c0","name":"Odd 17:00","month":2,"year":2026,"students":[{"id":"7b6ee6e","name":"ravzahon","payments":[{"id":"6173796","label":"Main payment","amount":370000,"paid":true}]},{"id":"733207e","name":"sevinch","payments":[{"id":"9a750fb","label":"Main payment","amount":370000,"paid":true}]},{"id":"24bab16","name":"umidjon","payments":[{"id":"55a7ba8","label":"Main payment","amount":370000,"paid":true}]},{"id":"b5c63dc","name":"gulchiroy","payments":[{"id":"1ba5182","label":"Main payment","amount":0,"paid":false}]},{"id":"3cb4387","name":"yahyobek","payments":[{"id":"b5ba411","label":"Main payment","amount":0,"paid":false},{"id":"0cff68b","label":"Extra payment","amount":93000,"paid":true}]},{"id":"294baee","name":"farruxxoja","payments":[{"id":"94150bd","label":"Main payment","amount":0,"paid":false}]},{"id":"9f2c742","name":"elmurod","payments":[{"id":"197fd42","label":"Main payment","amount":0,"paid":false},{"id":"ac972fc","label":"Extra payment","amount":93000,"paid":true}]},{"id":"d2c3727","name":"ismigul","payments":[{"id":"a18af74","label":"Main payment","amount":0,"paid":false}]},{"id":"ef8d92a","name":"munosibhon","payments":[{"id":"ef54fb6","label":"Main payment","amount":370000,"paid":true}]},{"id":"13ac354","name":"ruxshona","payments":[{"id":"13b767b","label":"Main payment","amount":0,"paid":false}]},{"id":"b355056","name":"husniddin","payments":[{"id":"f65c41a","label":"Main payment","amount":199000,"paid":true}]},{"id":"3258afb","name":"sanjarbek","payments":[{"id":"6cd4a52","label":"Main payment","amount":228000,"paid":true}]}]}];
+
+// ── PDF Generator ──
+function generatePDF(groups, month, year, allMonths){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+  const title=`My Classes — ${MONTHS[month]} ${year}`;
+  doc.setFontSize(16);doc.setFont("helvetica","bold");
+  doc.text(title,14,16);
+  doc.setFontSize(9);doc.setFont("helvetica","normal");
+  doc.text(`Generated: ${new Date().toLocaleDateString()}`,14,22);
+
+  const monthGroups=groups.filter(g=>g.month===month&&g.year===year);
+  let y=30;
+
+  monthGroups.forEach(g=>{
+    const totalDue=g.students.reduce((s,st)=>s+st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+    const totalPaid=g.students.reduce((s,st)=>s+st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+
+    if(y>250){doc.addPage();y=20;}
+    doc.setFont("helvetica","bold");doc.setFontSize(12);
+    doc.text(g.name,14,y);
+    doc.setFont("helvetica","normal");doc.setFontSize(9);
+    doc.text(`Total: ${fmt(totalDue)}  |  Collected: ${fmt(totalPaid)}  |  Remaining: ${fmt(totalDue-totalPaid)}`,14,y+6);
+    y+=12;
+
+    const rows=g.students.map(st=>{
+      const due=st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0);
+      const paid=st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0);
+      const breakdown=st.payments.map(p=>`${p.label}: ${fmt(p.amount)} (${p.paid?"✓":"✗"})`).join(" | ");
+      return[st.name, fmt(due), fmt(paid), fmt(due-paid), paid>=due&&due>0?"PAID":"UNPAID"];
+    });
+
+    doc.autoTable({
+      startY:y, head:[["Student","Total Due","Paid","Remaining","Status"]],
+      body:rows,
+      styles:{fontSize:8,cellPadding:2},
+      headStyles:{fillColor:[255,214,0],textColor:[0,0,0],fontStyle:"bold"},
+      alternateRowStyles:{fillColor:[245,245,245]},
+      columnStyles:{4:{halign:"center"}},
+      margin:{left:14,right:14},
+    });
+    y=doc.lastAutoTable.finalY+10;
+  });
+
+  // Summary page
+  doc.addPage();
+  doc.setFont("helvetica","bold");doc.setFontSize(14);
+  doc.text(`Payment Summary — ${MONTHS[month]} ${year}`,14,20);
+  y=30;
+
+  const allPaid=monthGroups.reduce((s,g)=>s+g.students.reduce((a,st)=>a+st.payments.filter(p=>p.paid).reduce((b,p)=>b+(Number(p.amount)||0),0),0),0);
+  const allDue=monthGroups.reduce((s,g)=>s+g.students.reduce((a,st)=>a+st.payments.reduce((b,p)=>b+(Number(p.amount)||0),0),0),0);
+
+  // Payment amount breakdown
+  const breakdown={};
+  monthGroups.forEach(g=>g.students.forEach(st=>st.payments.filter(p=>p.paid&&p.amount>0).forEach(p=>{
+    const k=p.amount;
+    breakdown[k]=(breakdown[k]||0)+1;
+  })));
+
+  doc.autoTable({
+    startY:y,
+    head:[["Metric","Value"]],
+    body:[
+      ["Total Billed",fmt(allDue)],
+      ["Total Collected",fmt(allPaid)],
+      ["Uncollected",fmt(allDue-allPaid)],
+      [`Your Income (${TEACHER_PCT}%)`,fmt(allPaid*(TEACHER_PCT/100))],
+      [`Center Share (${100-TEACHER_PCT}%)`,fmt(allPaid*((100-TEACHER_PCT)/100))],
+    ],
+    styles:{fontSize:10},
+    headStyles:{fillColor:[255,214,0],textColor:[0,0,0],fontStyle:"bold"},
+    margin:{left:14,right:14},
+  });
+  y=doc.lastAutoTable.finalY+10;
+
+  doc.setFont("helvetica","bold");doc.setFontSize(11);
+  doc.text("Payment Amount Breakdown",14,y);y+=8;
+
+  const bdRows=Object.entries(breakdown).sort((a,b)=>Number(b[0])-Number(a[0])).map(([amt,cnt])=>[fmt(Number(amt)),`${cnt} student${cnt!==1?"s":""}`,fmt(Number(amt)*cnt)]);
+  doc.autoTable({
+    startY:y, head:[["Amount","Count","Subtotal"]],
+    body:bdRows,
+    styles:{fontSize:9},
+    headStyles:{fillColor:[255,214,0],textColor:[0,0,0],fontStyle:"bold"},
+    margin:{left:14,right:14},
+  });
+
+  doc.save(`classes-${MONTHS[month]}-${year}.pdf`);
+}
+
+// ── Primitives ──
+const Inp=({style={}, ...p})=>(
+  <input style={{background:BG3,border:`1px solid ${G2}`,borderRadius:8,color:TXT,padding:"10px 14px",fontSize:14,outline:"none",width:"100%",...style}} {...p}/>
+);
+const YBtn=({onClick,style={},children})=>(
+  <button onClick={onClick} style={{background:Y,border:"none",borderRadius:10,color:"#000",padding:"10px 20px",cursor:"pointer",fontSize:14,fontWeight:700,...style}}>{children}</button>
+);
+const OutBtn=({onClick,style={},children})=>(
+  <button onClick={onClick} style={{background:"transparent",border:`1px solid ${G2}`,borderRadius:8,color:G1,padding:"8px 16px",cursor:"pointer",fontSize:13,...style}}>{children}</button>
+);
+const BackBtn=({onClick})=>(
+  <button onClick={onClick} style={{background:BG3,border:`1px solid ${G2}`,color:TXT,borderRadius:10,padding:"8px 16px",cursor:"pointer",fontSize:14}}>← Back</button>
+);
+const Lbl=({children})=><div style={{color:G1,fontSize:11,fontWeight:700,letterSpacing:"0.08em",marginBottom:6}}>{children}</div>;
+const Overlay=({onClose,children})=>(
+  <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:BG2,border:`1px solid ${G2}`,borderRadius:20,padding:26,width:"100%",maxWidth:460,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,.15)"}}>
+      {children}
+    </div>
+  </div>
+);
+
+// ── Student Modal (no personal info) ──
+function StudentModal({student,onSave,onClose}){
+  const[d,setD]=useState({...student,payments:student.payments.map(p=>({...p}))});
+  const updP=(i,f,v)=>setD(x=>({...x,payments:x.payments.map((p,j)=>j===i?{...p,[f]:v}:p)}));
+  const addP=()=>setD(x=>({...x,payments:[...x.payments,{id:uid(),label:"Additional payment",amount:0,paid:false}]}));
+  const delP=i=>setD(x=>({...x,payments:x.payments.filter((_,j)=>j!==i)}));
+  const totalDue=d.payments.reduce((a,p)=>a+(Number(p.amount)||0),0);
+  const totalPaid=d.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0);
+  return(
+    <Overlay onClose={onClose}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+        <span style={{color:TXT,fontWeight:800,fontSize:18}}>{d.name||"Student"}</span>
+        <button onClick={onClose} style={{background:"none",border:"none",color:G1,cursor:"pointer",fontSize:22}}>✕</button>
+      </div>
+      <Lbl>Student Name</Lbl>
+      <Inp value={d.name} onChange={e=>setD(x=>({...x,name:e.target.value}))} placeholder="Student name" style={{marginBottom:20}}/>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <span style={{color:TXT,fontWeight:700}}>Payment Records</span>
+        <span style={{color:Y,fontSize:13,fontWeight:700,background:"#111",borderRadius:20,padding:"2px 10px"}}>{fmt(totalPaid)} / {fmt(totalDue)}</span>
+      </div>
+      {d.payments.map((p,i)=>(
+        <div key={p.id} style={{background:p.paid?`${Y}22`:BG3,borderRadius:10,padding:12,marginBottom:10,border:p.paid?`1px solid ${YD}`:`1px solid ${G2}`}}>
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
+            <Inp value={p.label} onChange={e=>updP(i,"label",e.target.value)} placeholder="Payment label" style={{background:BG2}}/>
+            {i>0&&<button onClick={()=>delP(i)} style={{background:"rgba(220,50,50,.1)",border:"1px solid rgba(220,50,50,.2)",color:"#c00",borderRadius:8,padding:"0 10px",cursor:"pointer"}}>✕</button>}
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{position:"relative",flex:1}}>
+              <Inp type="number" value={p.amount} onChange={e=>updP(i,"amount",e.target.value)} style={{paddingRight:50,background:BG2}}/>
+              <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",color:G1,fontSize:12}}>so'm</span>
+            </div>
+            <button onClick={()=>updP(i,"paid",!p.paid)} style={{padding:"10px 14px",borderRadius:8,border:"none",cursor:"pointer",background:p.paid?Y:BG3,color:p.paid?"#000":G1,fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>
+              {p.paid?"✓ Paid":"Unpaid"}
+            </button>
+          </div>
+        </div>
+      ))}
+      <OutBtn onClick={addP} style={{width:"100%",textAlign:"center",marginBottom:20,borderStyle:"dashed"}}>+ Add Extra Payment</OutBtn>
+      <div style={{display:"flex",gap:10}}>
+        <OutBtn onClick={onClose} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
+        <YBtn onClick={()=>onSave(d)} style={{flex:2,textAlign:"center"}}>Save Changes</YBtn>
+      </div>
+    </Overlay>
+  );
+}
+
+// ── Group View ──
+function GroupView({group,monthLabel,onBack,onUpdate}){
+  const[editSt,setEditSt]=useState(null);
+  const[adding,setAdding]=useState(false);
+  const[nm,setNm]=useState("");
+  const totalDue=group.students.reduce((s,st)=>s+st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+  const totalPaid=group.students.reduce((s,st)=>s+st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+  const pct=totalDue>0?Math.min(100,(totalPaid/totalDue)*100):0;
+  const saveSt=u=>{onUpdate({...group,students:group.students.map(s=>s.id===u.id?u:s)});setEditSt(null);};
+  const delSt=id=>onUpdate({...group,students:group.students.filter(s=>s.id!==id)});
+  const addSt=()=>{if(!nm.trim())return;onUpdate({...group,students:[...group.students,makeStudent(nm.trim())]});setNm("");setAdding(false);};
+  return(
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
+        <BackBtn onClick={onBack}/>
+        <div style={{color:G1,fontSize:13}}>{monthLabel} /</div>
+        <div style={{color:TXT,fontWeight:700,fontSize:15}}>{group.name}</div>
+      </div>
+      <div style={{background:Y,borderRadius:18,padding:"22px 26px",marginBottom:24}}>
+        <div style={{color:"#00000088",fontSize:11,fontWeight:700,letterSpacing:"0.1em",marginBottom:6}}>GROUP TOTAL PAYMENT</div>
+        <div style={{fontSize:30,fontWeight:800,color:"#000",marginBottom:16}}>{fmt(totalDue)}</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:20}}>
+          {[["COLLECTED",fmt(totalPaid),"#000"],["REMAINING",fmt(totalDue-totalPaid),"#444"],["STUDENTS",group.students.length,"#000"]].map(([l,v,c])=>(
+            <div key={l}><div style={{color:"#00000077",fontSize:11}}>{l}</div><div style={{color:c,fontWeight:700,fontSize:16}}>{v}</div></div>
+          ))}
+        </div>
+        <div style={{marginTop:14,height:5,background:"rgba(0,0,0,.15)",borderRadius:4}}>
+          <div style={{height:"100%",borderRadius:4,background:"#000",width:`${pct}%`,transition:"width .4s"}}/>
+        </div>
+        <div style={{color:"#00000066",fontSize:11,marginTop:5,textAlign:"right"}}>{Math.round(pct)}% collected</div>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <span style={{color:TXT,fontWeight:700,fontSize:16}}>Students</span>
+        <YBtn onClick={()=>setAdding(true)} style={{padding:"8px 14px",fontSize:13}}>+ Add Student</YBtn>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {group.students.length===0&&<div style={{color:G1,textAlign:"center",padding:"40px 0",border:`1px dashed ${G2}`,borderRadius:12,background:BG2}}>No students yet.</div>}
+        {group.students.map(st=>{
+          const due=st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0);
+          const paid=st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0);
+          const full=due>0&&paid>=due;
+          return(
+            <div key={st.id} style={{background:BG2,border:`1px solid ${full?YD:G2}`,borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+              <div style={{width:40,height:40,borderRadius:"50%",background:full?Y:BG3,border:`2px solid ${full?YD:G2}`,display:"flex",alignItems:"center",justifyContent:"center",color:full?"#000":TXT,fontWeight:800,fontSize:16,flexShrink:0}}>
+                {(st.name||"?").charAt(0).toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:TXT,fontWeight:600,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{st.name||"Unnamed"}</div>
+                <div style={{color:G1,fontSize:12,marginTop:2}}>{st.payments.length} payment{st.payments.length!==1?"s":""}</div>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{color:full?"#000":TXT,fontWeight:700,fontSize:14}}>{fmt(paid)}</div>
+                <div style={{color:G1,fontSize:12}}>of {fmt(due)}</div>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>setEditSt(st)} style={{background:BG3,border:`1px solid ${G2}`,color:TXT,borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>✏️</button>
+                <button onClick={()=>delSt(st.id)} style={{background:"rgba(200,0,0,.07)",border:"1px solid rgba(200,0,0,.15)",color:"#c00",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>✕</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {adding&&(
+        <div style={{marginTop:14,background:BG2,border:`1px dashed ${G2}`,borderRadius:12,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+          <div style={{color:G1,fontWeight:600,marginBottom:12,fontSize:13}}>NEW STUDENT</div>
+          <Inp placeholder="Full name *" value={nm} onChange={e=>setNm(e.target.value)} style={{marginBottom:12}} onKeyDown={e=>e.key==="Enter"&&addSt()}/>
+          <div style={{display:"flex",gap:8}}>
+            <OutBtn onClick={()=>{setAdding(false);setNm("");}} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
+            <YBtn onClick={addSt} style={{flex:2,textAlign:"center"}}>Add Student</YBtn>
+          </div>
+        </div>
+      )}
+      {editSt&&<StudentModal student={editSt} onSave={saveSt} onClose={()=>setEditSt(null)}/>}
+    </div>
+  );
+}
+
+// ── Month View ──
+function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDeleteGroup,onCreateGroup,allGroups}){
+  const[creating,setCreating]=useState(false);
+  const[cName,setCName]=useState("");
+  const label=`${MONTHS[monthIdx]} ${year}`;
+  const mg=groups.filter(g=>g.month===monthIdx&&g.year===year);
+  const totalDue=mg.reduce((s,g)=>s+g.students.reduce((a,st)=>a+st.payments.reduce((b,p)=>b+(Number(p.amount)||0),0),0),0);
+  const totalPaid=mg.reduce((s,g)=>s+g.students.reduce((a,st)=>a+st.payments.filter(p=>p.paid).reduce((b,p)=>b+(Number(p.amount)||0),0),0),0);
+
+  const create=()=>{
+    if(!cName.trim())return;
+    onCreateGroup({id:uid(),name:cName.trim(),month:monthIdx,year,students:[]});
+    setCName("");setCreating(false);
+  };
+
+  const exportPDF=()=>generatePDF(groups,monthIdx,year,allGroups);
+
+  return(
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
+        <BackBtn onClick={onBack}/>
+        <div style={{flex:1}}>
+          <h2 style={{margin:0,color:TXT,fontSize:22,fontWeight:800}}>{label}</h2>
+          <div style={{color:G1,fontSize:13}}>{mg.length} group{mg.length!==1?"s":""}</div>
+        </div>
+        <button onClick={exportPDF} style={{background:"#111",border:"none",borderRadius:10,color:"#fff",padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:600}}>📄 PDF</button>
+        <YBtn onClick={()=>setCreating(true)} style={{padding:"8px 14px",fontSize:13}}>+ New Group</YBtn>
+      </div>
+      <div style={{background:Y,borderRadius:16,padding:"18px 22px",marginBottom:22,display:"flex",flexWrap:"wrap",gap:20}}>
+        <div><div style={{color:"#00000077",fontSize:11}}>MONTH TOTAL</div><div style={{color:"#000",fontWeight:800,fontSize:20}}>{fmt(totalDue)}</div></div>
+        <div><div style={{color:"#00000077",fontSize:11}}>COLLECTED</div><div style={{color:"#000",fontWeight:700,fontSize:20}}>{fmt(totalPaid)}</div></div>
+        <div><div style={{color:"#00000077",fontSize:11}}>REMAINING</div><div style={{color:"#444",fontWeight:700,fontSize:20}}>{fmt(totalDue-totalPaid)}</div></div>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {mg.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1px dashed ${G2}`,borderRadius:12,background:BG2}}>No groups yet. Create one!</div>}
+        {mg.map(g=>{
+          const due=g.students.reduce((s,st)=>s+st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+          const paid=g.students.reduce((s,st)=>s+st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+          const pct=due>0?Math.min(100,(paid/due)*100):0;
+          return(
+            <div key={g.id} onClick={()=>onSelectGroup(g.id)} style={{background:BG2,border:`1px solid ${G2}`,borderLeft:`4px solid ${Y}`,borderRadius:14,padding:"16px 20px",cursor:"pointer",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}
+              onTouchStart={e=>e.currentTarget.style.background=BG3} onTouchEnd={e=>e.currentTarget.style.background=BG2}
+              onMouseEnter={e=>e.currentTarget.style.background=BG3} onMouseLeave={e=>e.currentTarget.style.background=BG2}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div>
+                  <div style={{color:TXT,fontWeight:700,fontSize:15}}>{g.name}</div>
+                  <div style={{color:G1,fontSize:13,marginTop:2}}>{g.students.length} student{g.students.length!==1?"s":""}</div>
+                </div>
+                <button onClick={e=>{e.stopPropagation();onDeleteGroup(g.id);}} style={{background:"transparent",border:`1px solid ${G2}`,color:G1,borderRadius:8,padding:"3px 9px",cursor:"pointer",fontSize:12}}>✕</button>
+              </div>
+              <div style={{marginTop:12,display:"flex",gap:20}}>
+                <div><div style={{color:G1,fontSize:11}}>TOTAL</div><div style={{color:TXT,fontWeight:700,fontSize:14}}>{fmt(due)}</div></div>
+                <div><div style={{color:G1,fontSize:11}}>COLLECTED</div><div style={{color:"#000",fontWeight:700,fontSize:14}}>{fmt(paid)}</div></div>
+              </div>
+              <div style={{marginTop:10,height:3,background:BG3,borderRadius:4}}>
+                <div style={{height:"100%",borderRadius:4,background:Y,width:`${pct}%`,transition:"width .4s"}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {creating&&(
+        <Overlay onClose={()=>setCreating(false)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+            <span style={{color:TXT,fontWeight:800,fontSize:18}}>New Group · {label}</span>
+            <button onClick={()=>setCreating(false)} style={{background:"none",border:"none",color:G1,cursor:"pointer",fontSize:22}}>✕</button>
+          </div>
+          <Lbl>Group Name *</Lbl>
+          <Inp placeholder="e.g. Even 13:00" value={cName} onChange={e=>setCName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&create()} style={{marginBottom:22}}/>
+          <div style={{display:"flex",gap:10}}>
+            <OutBtn onClick={()=>setCreating(false)} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
+            <YBtn onClick={create} style={{flex:2,textAlign:"center"}}>Create Group</YBtn>
+          </div>
+        </Overlay>
+      )}
+    </div>
+  );
+}
+
+// ── Payment Summary Section ──
+function PaymentSummary({groups}){
+  const[open,setOpen]=useState(true);
+  const activeMonths=useMemo(()=>{
+    const seen=new Set();const res=[];
+    groups.forEach(g=>{const k=`${g.year}-${g.month}`;if(!seen.has(k)){seen.add(k);res.push({month:g.month,year:g.year});}});
+    res.sort((a,b)=>a.year!==b.year?a.year-b.year:a.month-b.month);
+    return res;
+  },[groups]);
+
+  return(
+    <div style={{background:BG2,border:`1px solid ${G2}`,borderRadius:16,marginBottom:24,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{background:Y,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+        <span style={{color:"#000",fontWeight:800,fontSize:15}}>📊 Payment Summary by Month</span>
+        <span style={{color:"#000",fontSize:18}}>{open?"▲":"▼"}</span>
+      </div>
+      {open&&(
+        <div style={{padding:0}}>
+          {activeMonths.length===0&&<div style={{color:G1,padding:"20px",textAlign:"center"}}>No data yet.</div>}
+          {activeMonths.map(({month,year})=>{
+            const mg=groups.filter(g=>g.month===month&&g.year===year);
+            const allStudents=mg.flatMap(g=>g.students);
+            const allPayments=allStudents.flatMap(st=>st.payments);
+            const totalDue=allPayments.reduce((a,p)=>a+(Number(p.amount)||0),0);
+            const totalPaid=allPayments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0);
+            const uncollected=totalDue-totalPaid;
+
+            // Breakdown: count each payment amount
+            const breakdown={};
+            allPayments.filter(p=>p.paid&&p.amount>0).forEach(p=>{
+              const k=p.amount;
+              breakdown[k]=(breakdown[k]||0)+1;
+            });
+            const bdEntries=Object.entries(breakdown).sort((a,b)=>Number(b[0])-Number(a[0]));
+
+            return(
+              <div key={`${year}-${month}`} style={{borderBottom:`1px solid ${G2}`,padding:"16px 20px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <span style={{color:TXT,fontWeight:800,fontSize:15}}>{MONTHS[month]} {year}</span>
+                  <span style={{color:G1,fontSize:12}}>{mg.length} groups · {allStudents.length} students</span>
+                </div>
+                {/* Key figures */}
+                <div style={{display:"flex",flexWrap:"wrap",gap:0,marginBottom:12,background:BG3,borderRadius:10,overflow:"hidden"}}>
+                  {[["TOTAL BILLED",fmt(totalDue),TXT],["COLLECTED",fmt(totalPaid),"#000"],["UNCOLLECTED",fmt(uncollected),"#c00"],[`YOUR (${TEACHER_PCT}%)`,fmt(totalPaid*(TEACHER_PCT/100)),"#000"]].map(([l,v,c],i,arr)=>(
+                    <div key={l} style={{flex:"1 1 100px",padding:"10px 14px",borderRight:i<arr.length-1?`1px solid ${G2}`:"none"}}>
+                      <div style={{color:G1,fontSize:10,fontWeight:700,letterSpacing:"0.06em",marginBottom:3}}>{l}</div>
+                      <div style={{color:c,fontWeight:800,fontSize:13}}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Payment breakdown */}
+                {bdEntries.length>0&&(
+                  <div>
+                    <div style={{color:G1,fontSize:11,fontWeight:700,letterSpacing:"0.07em",marginBottom:8}}>PAYMENT BREAKDOWN</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {bdEntries.map(([amt,cnt])=>(
+                        <div key={amt} style={{background:Y,borderRadius:8,padding:"5px 12px",display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{color:"#000",fontWeight:700,fontSize:13}}>{fmtShort(Number(amt))}</span>
+                          <span style={{color:"#00000088",fontSize:11}}>×{cnt}</span>
+                          <span style={{color:"#444",fontSize:11}}>= {fmtShort(Number(amt)*cnt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main App ──
+function App(){
+  const[groups,setGroups]=useState(()=>{ const d=window._loadData(); return d||MARCH_DATA; });
+  const[view,setView]=useState("home");
+  const[selMonth,setSelMonth]=useState(null);
+  const[selGroup,setSelGroup]=useState(null);
+  const[addingMonth,setAddingMonth]=useState(false);
+  const[newMonthIdx,setNewMonthIdx]=useState(NOW_MONTH);
+  const[copyFromMonth,setCopyFromMonth]=useState("");
+  const[saved,setSaved]=useState(false);
+  const[restoreMsg,setRestoreMsg]=useState("");
+
+  // Auto-save
+  useEffect(()=>{
+    window._saveData(groups);
+    setSaved(true);
+    const t=setTimeout(()=>setSaved(false),1200);
+    return()=>clearTimeout(t);
+  },[groups]);
+
+  // Auto PDF on 5th of month
+  useEffect(()=>{
+    const today=new Date();
+    if(today.getDate()===5){
+      const key=`autoPDF_${today.getFullYear()}_${today.getMonth()}`;
+      if(!localStorage.getItem(key)){
+        const prevMonth=today.getMonth()===0?11:today.getMonth()-1;
+        const prevYear=today.getMonth()===0?today.getFullYear()-1:today.getFullYear();
+        const hasData=groups.some(g=>g.month===prevMonth&&g.year===prevYear);
+        if(hasData){
+          setTimeout(()=>{
+            generatePDF(groups,prevMonth,prevYear,groups);
+            localStorage.setItem(key,"done");
+          },2000);
+        }
+      }
+    }
+  },[]);
+
+  const updGroup=useCallback(g=>setGroups(p=>p.map(x=>x.id===g.id?g:x)),[]);
+  const addGroup=useCallback(g=>setGroups(p=>[...p,g]),[]);
+  const delGroup=useCallback(id=>setGroups(p=>p.filter(x=>x.id!==id)),[]);
+
+  // Copy students from one month to a new month
+  const openMonth=(targetMonth,targetYear,copyKey)=>{
+    if(copyKey){
+      const[cm,cy]=copyKey.split("-").map(Number);
+      const srcGroups=groups.filter(g=>g.month===cm&&g.year===cy);
+      srcGroups.forEach(g=>{
+        const already=groups.some(x=>x.month===targetMonth&&x.year===targetYear&&x.name===g.name);
+        if(!already){
+          const newGroup={
+            ...g,
+            id:uid(),
+            month:targetMonth,
+            year:targetYear,
+            students:g.students.map(st=>({
+              ...st,
+              id:uid(),
+              payments:st.payments.map(p=>({...p,id:uid(),paid:false}))
+            }))
+          };
+          addGroup(newGroup);
+        }
+      });
+    }
+    setSelMonth(targetMonth);
+    setView("month");
+    setAddingMonth(false);
+  };
+
+  const activeMonths=useMemo(()=>{
+    const seen=new Set();const res=[];
+    groups.forEach(g=>{const k=`${g.year}-${g.month}`;if(!seen.has(k)){seen.add(k);res.push({month:g.month,year:g.year});}});
+    res.sort((a,b)=>a.year!==b.year?a.year-b.year:a.month-b.month);
+    return res;
+  },[groups]);
+
+  const monthStats=(month,year)=>{
+    const mg=groups.filter(g=>g.month===month&&g.year===year);
+    const due=mg.reduce((s,g)=>s+g.students.reduce((a,st)=>a+st.payments.reduce((b,p)=>b+(Number(p.amount)||0),0),0),0);
+    const paid=mg.reduce((s,g)=>s+g.students.reduce((a,st)=>a+st.payments.filter(p=>p.paid).reduce((b,p)=>b+(Number(p.amount)||0),0),0),0);
+    return{due,paid,groups:mg.length,students:mg.reduce((s,g)=>s+g.students.length,0)};
+  };
+
+  const doBackup=()=>{
+    const blob=new Blob([JSON.stringify(groups,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    const d=new Date();
+    a.href=url;
+    a.download=`myclasses-backup-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const doRestore=(e)=>{
+    const file=e.target.files[0]; if(!file)return;
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      try{
+        const parsed=JSON.parse(ev.target.result);
+        if(!Array.isArray(parsed))throw new Error();
+        setGroups(parsed);
+        setRestoreMsg("✓ Restored!");
+        setTimeout(()=>setRestoreMsg(""),3000);
+      }catch{
+        setRestoreMsg("✗ Invalid file");
+        setTimeout(()=>setRestoreMsg(""),3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value="";
+  };
+
+  // ── Routing ──
+  if(view==="group"&&selGroup){
+    const grp=groups.find(g=>g.id===selGroup);
+    if(!grp){setView("month");return null;}
+    return(
+      <div style={{minHeight:"100vh",background:BG,padding:"24px 16px 40px"}}>
+        <div style={{maxWidth:760,margin:"0 auto"}}>
+          <GroupView group={grp} monthLabel={`${MONTHS[grp.month]} ${grp.year}`}
+            onBack={()=>setView("month")} onUpdate={g=>{updGroup(g);}}/>
+        </div>
+        {saved&&<div style={{position:"fixed",bottom:20,right:20,background:"#111",color:Y,borderRadius:20,padding:"6px 14px",fontSize:13,fontWeight:700}}>✓ Saved</div>}
+      </div>
+    );
+  }
+
+  if(view==="month"&&selMonth!==null){
+    return(
+      <div style={{minHeight:"100vh",background:BG,padding:"24px 16px 40px"}}>
+        <div style={{maxWidth:760,margin:"0 auto"}}>
+          <MonthView monthIdx={selMonth} year={NOW_YEAR} groups={groups}
+            onBack={()=>setView("home")}
+            onSelectGroup={id=>{setSelGroup(id);setView("group");}}
+            onUpdateGroup={updGroup} onDeleteGroup={delGroup} onCreateGroup={addGroup}
+            allGroups={groups}/>
+        </div>
+        {saved&&<div style={{position:"fixed",bottom:20,right:20,background:"#111",color:Y,borderRadius:20,padding:"6px 14px",fontSize:13,fontWeight:700}}>✓ Saved</div>}
+      </div>
+    );
+  }
+
+  // ── Home ──
+  return(
+    <div style={{minHeight:"100vh",background:BG,padding:"24px 16px 40px"}}>
+      <div style={{maxWidth:760,margin:"0 auto"}}>
+
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20}}>
+          <div style={{background:Y,borderRadius:14,padding:"8px 13px",fontSize:36,lineHeight:1}}>🎓</div>
+          <div style={{flex:1}}>
+            <h1 style={{margin:0,color:TXT,fontSize:26,fontWeight:900,letterSpacing:"-0.5px"}}>My Classes</h1>
+            <p style={{margin:"4px 0 0",color:G1,fontSize:13}}>Educational Center</p>
+          </div>
+        </div>
+
+        {/* Backup & Restore */}
+        <div style={{display:"flex",gap:8,marginBottom:22,alignItems:"center",flexWrap:"wrap"}}>
+          <button onClick={doBackup} style={{display:"flex",alignItems:"center",gap:6,background:BG2,border:`1px solid ${G2}`,borderRadius:10,color:TXT,padding:"9px 16px",cursor:"pointer",fontSize:13,fontWeight:600,boxShadow:"0 1px 3px rgba(0,0,0,.07)"}}>
+            ⬇ Backup
+          </button>
+          <label style={{display:"flex",alignItems:"center",gap:6,background:BG2,border:`1px solid ${G2}`,borderRadius:10,color:TXT,padding:"9px 16px",cursor:"pointer",fontSize:13,fontWeight:600,boxShadow:"0 1px 3px rgba(0,0,0,.07)"}}>
+            ⬆ Restore
+            <input type="file" accept=".json" onChange={doRestore} style={{display:"none"}}/>
+          </label>
+          {restoreMsg&&<span style={{color:restoreMsg.startsWith("✓")?"#080":"#c00",fontSize:13,fontWeight:700}}>{restoreMsg}</span>}
+        </div>
+
+        {/* Monthly income overview */}
+        <div style={{color:G1,fontSize:11,fontWeight:700,letterSpacing:"0.1em",marginBottom:12}}>MONTHLY INCOME OVERVIEW</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
+          {activeMonths.length===0&&<div style={{color:G1,fontSize:14,padding:"20px 0"}}>No data yet.</div>}
+          {activeMonths.map(({month,year})=>{
+            const{due,paid}=monthStats(month,year);
+            const myIncome=paid*(TEACHER_PCT/100);
+            const isCurrent=month===NOW_MONTH&&year===NOW_YEAR;
+            return(
+              <div key={`${year}-${month}-inc`} style={{background:isCurrent?Y:BG2,border:`1px solid ${isCurrent?YD:G2}`,borderRadius:16,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+                <div style={{background:isCurrent?"rgba(0,0,0,.08)":"#F8F8F8",padding:"10px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{color:isCurrent?"#000":TXT,fontWeight:800,fontSize:15}}>{MONTHS[month]} {year}</span>
+                    {isCurrent&&<span style={{background:"#000",color:Y,fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:20}}>CURRENT</span>}
+                  </div>
+                </div>
+                <div style={{padding:"14px 18px",display:"flex",flexWrap:"wrap",gap:0}}>
+                  {[["TOTAL BILLED",fmt(due),TXT],["COLLECTED",fmt(paid),TXT],[`YOUR INCOME (${TEACHER_PCT}%)`,fmt(myIncome),"#000"],[`CENTER (${100-TEACHER_PCT}%)`,fmt(paid*((100-TEACHER_PCT)/100)),G1]].map(([label,val,col],i,arr)=>(
+                    <div key={label} style={{flex:"1 1 130px",padding:"6px 0",borderRight:i<arr.length-1?`1px solid ${isCurrent?"rgba(0,0,0,.15)":G2}`:"none",paddingRight:14,paddingLeft:i>0?14:0}}>
+                      <div style={{color:isCurrent?"#00000077":G1,fontSize:10,fontWeight:700,letterSpacing:"0.07em",marginBottom:4}}>{label}</div>
+                      <div style={{color:isCurrent?"#000":col,fontWeight:800,fontSize:14}}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Payment Summary Section */}
+        <PaymentSummary groups={groups}/>
+
+        {/* Months nav */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <span style={{color:TXT,fontWeight:800,fontSize:18}}>Months <span style={{color:G1,fontWeight:400,fontSize:14}}>({activeMonths.length})</span></span>
+          <YBtn onClick={()=>setAddingMonth(true)} style={{padding:"8px 14px",fontSize:13}}>+ New Month</YBtn>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {activeMonths.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1px dashed ${G2}`,borderRadius:12,background:BG2}}>No months yet. Add your first month!</div>}
+          {activeMonths.map(({month,year})=>{
+            const{due,paid,groups:gc,students:sc}=monthStats(month,year);
+            const isCurrent=month===NOW_MONTH&&year===NOW_YEAR;
+            return(
+              <div key={`${year}-${month}-card`} onClick={()=>{setSelMonth(month);setView("month");}}
+                style={{background:BG2,border:`1px solid ${isCurrent?YD:G2}`,borderLeft:`4px solid ${Y}`,borderRadius:14,padding:"18px 22px",cursor:"pointer",display:"flex",alignItems:"center",gap:16,boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}
+                onTouchStart={e=>e.currentTarget.style.background=BG3} onTouchEnd={e=>e.currentTarget.style.background=BG2}
+                onMouseEnter={e=>e.currentTarget.style.background=BG3} onMouseLeave={e=>e.currentTarget.style.background=BG2}>
+                <div style={{background:isCurrent?Y:BG3,borderRadius:10,padding:"10px 14px",textAlign:"center",flexShrink:0}}>
+                  <div style={{color:isCurrent?"#000":G1,fontSize:11,fontWeight:700}}>{MONTHS[month].slice(0,3).toUpperCase()}</div>
+                  <div style={{color:isCurrent?"#000":TXT,fontSize:20,fontWeight:900}}>{year}</div>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{color:TXT,fontWeight:700,fontSize:16}}>{MONTHS[month]} {year}</span>
+                    {isCurrent&&<span style={{background:Y,color:"#000",fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:20}}>CURRENT</span>}
+                  </div>
+                  <div style={{color:G1,fontSize:13,marginTop:2}}>{gc} group{gc!==1?"s":""} · {sc} student{sc!==1?"s":""}</div>
+                  <div style={{marginTop:10,display:"flex",gap:16}}>
+                    <div><div style={{color:G1,fontSize:11}}>TOTAL</div><div style={{color:TXT,fontWeight:700,fontSize:14}}>{fmt(due)}</div></div>
+                    <div><div style={{color:G1,fontSize:11}}>COLLECTED</div><div style={{color:"#000",fontWeight:700,fontSize:14}}>{fmt(paid)}</div></div>
+                  </div>
+                </div>
+                <div style={{color:G1,fontSize:20}}>›</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {saved&&<div style={{position:"fixed",bottom:20,right:20,background:"#111",color:Y,borderRadius:20,padding:"6px 14px",fontSize:13,fontWeight:700}}>✓ Saved</div>}
+
+      {/* Add month modal */}
+      {addingMonth&&(
+        <Overlay onClose={()=>setAddingMonth(false)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+            <span style={{color:TXT,fontWeight:800,fontSize:18}}>Open Month</span>
+            <button onClick={()=>setAddingMonth(false)} style={{background:"none",border:"none",color:G1,cursor:"pointer",fontSize:22}}>✕</button>
+          </div>
+          <Lbl>Select Month</Lbl>
+          <select value={newMonthIdx} onChange={e=>setNewMonthIdx(Number(e.target.value))}
+            style={{background:BG3,border:`1px solid ${G2}`,borderRadius:8,color:TXT,padding:"10px 14px",fontSize:14,outline:"none",width:"100%",marginBottom:16,boxSizing:"border-box"}}>
+            {MONTHS.map((m,i)=><option key={m} value={i}>{m} {NOW_YEAR}</option>)}
+          </select>
+
+          {activeMonths.length>0&&(
+            <>
+              <Lbl>COPY STUDENTS FROM (optional)</Lbl>
+              <select value={copyFromMonth} onChange={e=>setCopyFromMonth(e.target.value)}
+                style={{background:BG3,border:`1px solid ${G2}`,borderRadius:8,color:TXT,padding:"10px 14px",fontSize:14,outline:"none",width:"100%",marginBottom:6,boxSizing:"border-box"}}>
+                <option value="">— Start empty —</option>
+                {activeMonths.map(({month,year})=>(
+                  <option key={`${year}-${month}`} value={`${month}-${year}`}>{MONTHS[month]} {year}</option>
+                ))}
+              </select>
+              <div style={{color:G1,fontSize:12,marginBottom:20}}>Students will be copied with payments reset to unpaid.</div>
+            </>
+          )}
+
+          <div style={{display:"flex",gap:10}}>
+            <OutBtn onClick={()=>setAddingMonth(false)} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
+            <YBtn onClick={()=>openMonth(newMonthIdx,NOW_YEAR,copyFromMonth||null)} style={{flex:2,textAlign:"center"}}>Open Month</YBtn>
+          </div>
+        </Overlay>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
