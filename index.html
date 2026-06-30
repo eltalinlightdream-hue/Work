@@ -228,6 +228,23 @@ function Confirm({title,message,confirmLabel="Delete",onConfirm,onClose}){
     </Overlay>
   );
 }
+// Action sheet opened by a row's three-dots button — keeps Delete out of easy reach
+function ActionSheet({title,subtitle,actions,onClose}){
+  return(
+    <Overlay onClose={onClose}>
+      <div style={{fontWeight:800,fontSize:18,color:TXT}}>{title}</div>
+      {subtitle&&<div style={{color:G1,fontSize:13,marginTop:2,marginBottom:16}}>{subtitle}</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:subtitle?0:16}}>
+        {actions.map((a,i)=>(
+          <button key={i} onClick={a.onClick} style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:a.danger?"#FDECEC":BG3,border:`1px solid ${a.danger?"#F6C9CA":G2}`,borderRadius:14,color:a.danger?BAD:TXT,padding:"15px 16px",cursor:"pointer",fontSize:15,fontWeight:700,minHeight:52}}>
+            <span style={{fontSize:18}}>{a.icon}</span> {a.label}
+          </button>
+        ))}
+      </div>
+      <OutBtn onClick={onClose} style={{width:"100%",textAlign:"center",marginTop:14}}>Cancel</OutBtn>
+    </Overlay>
+  );
+}
 
 // ── Student Modal (no personal info) ──
 function StudentModal({student,onSave,onClose}){
@@ -289,6 +306,7 @@ function GroupView({group,monthLabel,onBack,onUpdate}){
   const[adding,setAdding]=useState(false);
   const[nm,setNm]=useState("");
   const[delSt,setDelSt]=useState(null);
+  const[menuSt,setMenuSt]=useState(null);
   const totalDue=group.students.reduce((s,st)=>s+st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0),0);
   const totalPaid=group.students.reduce((s,st)=>s+st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
   const pct=totalDue>0?Math.min(100,(totalPaid/totalDue)*100):0;
@@ -334,9 +352,9 @@ function GroupView({group,monthLabel,onBack,onUpdate}){
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{color:TXT,fontWeight:700,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{st.name||"Unnamed"}</div>
-                <div style={{color:full?GOOD:G1,fontSize:12.5,marginTop:3,fontWeight:600}}>{full?"✓ Fully paid":`${fmt(paid)} of ${fmt(due)}`}</div>
+                <div style={{color:full?GOOD:G1,fontSize:12.5,marginTop:3,fontWeight:600}}>{full?`✓ Fully paid (${fmt(paid)})`:`${fmt(paid)} of ${fmt(due)}`}</div>
               </div>
-              <IconBtn onClick={e=>{e.stopPropagation();setDelSt(st);}} label="Delete student" danger>🗑</IconBtn>
+              <IconBtn onClick={e=>{e.stopPropagation();setMenuSt(st);}} label="More options" style={{fontSize:22,fontWeight:800}}>⋯</IconBtn>
               <div style={{color:G1,fontSize:20,flexShrink:0}}>›</div>
             </div>
           );
@@ -354,6 +372,10 @@ function GroupView({group,monthLabel,onBack,onUpdate}){
           </div>
         </Overlay>
       )}
+      {menuSt&&<ActionSheet title={menuSt.name||"Student"} subtitle="Choose an action" onClose={()=>setMenuSt(null)} actions={[
+        {icon:"✏️",label:"Edit student",onClick:()=>{setEditSt(menuSt);setMenuSt(null);}},
+        {icon:"🗑",label:"Delete student",danger:true,onClick:()=>{setDelSt(menuSt);setMenuSt(null);}},
+      ]}/>}
       {delSt&&<Confirm title="Delete student?" message={`"${delSt.name||"This student"}" and all their payment records will be permanently removed.`} onConfirm={()=>{removeSt(delSt.id);setDelSt(null);}} onClose={()=>setDelSt(null)}/>}
       {editSt&&<StudentModal student={editSt} onSave={saveSt} onClose={()=>setEditSt(null)}/>}
     </div>
@@ -365,6 +387,7 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
   const[creating,setCreating]=useState(false);
   const[cName,setCName]=useState("");
   const[delGrp,setDelGrp]=useState(null);
+  const[menuGrp,setMenuGrp]=useState(null);
   const label=`${MONTHS[monthIdx]} ${year}`;
   const mg=groups.filter(g=>g.month===monthIdx&&g.year===year);
   const totalDue=mg.reduce((s,g)=>s+g.students.reduce((a,st)=>a+st.payments.reduce((b,p)=>b+(Number(p.amount)||0),0),0),0);
@@ -413,7 +436,7 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
                   <div style={{color:G1,fontSize:13,marginTop:2}}>{g.students.length} student{g.students.length!==1?"s":""} · {Math.round(pct)}% collected</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                  <IconBtn onClick={e=>{e.stopPropagation();setDelGrp(g);}} label="Delete group" danger>🗑</IconBtn>
+                  <IconBtn onClick={e=>{e.stopPropagation();setMenuGrp(g);}} label="More options" style={{fontSize:22,fontWeight:800}}>⋯</IconBtn>
                   <div style={{color:G1,fontSize:20}}>›</div>
                 </div>
               </div>
@@ -441,6 +464,10 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
           </div>
         </Overlay>
       )}
+      {menuGrp&&<ActionSheet title={menuGrp.name} subtitle={`${menuGrp.students.length} student${menuGrp.students.length!==1?"s":""}`} onClose={()=>setMenuGrp(null)} actions={[
+        {icon:"📂",label:"Open group",onClick:()=>{onSelectGroup(menuGrp.id);setMenuGrp(null);}},
+        {icon:"🗑",label:"Delete group",danger:true,onClick:()=>{setDelGrp(menuGrp);setMenuGrp(null);}},
+      ]}/>}
       {delGrp&&<Confirm title="Delete group?" message={`"${delGrp.name}" and its ${delGrp.students.length} student${delGrp.students.length!==1?"s":""} will be permanently removed.`} onConfirm={()=>{onDeleteGroup(delGrp.id);setDelGrp(null);}} onClose={()=>setDelGrp(null)}/>}
     </div>
   );
@@ -641,7 +668,7 @@ function App(){
     const grp=groups.find(g=>g.id===selGroup);
     if(!grp){setView("month");return null;}
     return(
-      <div style={{minHeight:"100vh",background:BG,padding:"24px 16px 40px"}}>
+      <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
         <div style={{maxWidth:760,margin:"0 auto"}}>
           <GroupView group={grp} monthLabel={`${MONTHS[grp.month]} ${grp.year}`}
             onBack={()=>setView("month")} onUpdate={g=>{updGroup(g);}}/>
@@ -653,7 +680,7 @@ function App(){
 
   if(view==="month"&&selMonth!==null){
     return(
-      <div style={{minHeight:"100vh",background:BG,padding:"24px 16px 40px"}}>
+      <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
         <div style={{maxWidth:760,margin:"0 auto"}}>
           <MonthView monthIdx={selMonth} year={NOW_YEAR} groups={groups}
             onBack={()=>setView("home")}
