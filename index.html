@@ -53,8 +53,9 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
 }
 const SAVE_KEY="myClassesData_v3";
-function saveData(data){ const s=JSON.stringify(data); try{localStorage.setItem(SAVE_KEY,s);}catch(e){} try{sessionStorage.setItem(SAVE_KEY,s);}catch(e){} }
-function loadData(){ try{ const d=localStorage.getItem(SAVE_KEY)||sessionStorage.getItem(SAVE_KEY); if(d){const p=JSON.parse(d);if(Array.isArray(p)&&p.length)return p;} }catch(e){} return null; }
+const NEWCOMERS_KEY="myClassesNewcomers_v1";
+function saveData(key,data){ const s=JSON.stringify(data); try{localStorage.setItem(key,s);}catch(e){} try{sessionStorage.setItem(key,s);}catch(e){} }
+function loadData(key){ try{ const d=localStorage.getItem(key)||sessionStorage.getItem(key); if(d){const p=JSON.parse(d);if(Array.isArray(p))return p;} }catch(e){} return null; }
 window._saveData=saveData; window._loadData=loadData;
 </script>
 <script type="text/babel">
@@ -476,23 +477,32 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
 // ── Payment Summary Section ──
 function PaymentSummary({groups}){
   const[open,setOpen]=useState(true);
+  const[expanded,setExpanded]=useState(()=>new Set());
   const activeMonths=useMemo(()=>{
     const seen=new Set();const res=[];
     groups.forEach(g=>{const k=`${g.year}-${g.month}`;if(!seen.has(k)){seen.add(k);res.push({month:g.month,year:g.year});}});
     res.sort((a,b)=>a.year!==b.year?a.year-b.year:a.month-b.month);
-    return res;
+    return res.reverse();
   },[groups]);
+
+  const toggleMonth=(key)=>setExpanded(prev=>{
+    const next=new Set(prev);
+    if(next.has(key))next.delete(key);else next.add(key);
+    return next;
+  });
 
   return(
     <div style={{background:BG2,border:`1px solid ${G2}`,borderRadius:16,marginBottom:24,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
       <div onClick={()=>setOpen(o=>!o)} style={{background:Y,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-        <span style={{color:"#000",fontWeight:800,fontSize:15}}>📊 Payment Summary by Month</span>
+        <span style={{color:"#000",fontWeight:800,fontSize:15}}>📊 Summary of All Months</span>
         <span style={{color:"#000",fontSize:18}}>{open?"▲":"▼"}</span>
       </div>
       {open&&(
         <div style={{padding:0}}>
           {activeMonths.length===0&&<div style={{color:G1,padding:"20px",textAlign:"center"}}>No data yet.</div>}
           {activeMonths.map(({month,year})=>{
+            const key=`${year}-${month}`;
+            const isExp=expanded.has(key);
             const mg=groups.filter(g=>g.month===month&&g.year===year);
             const allStudents=mg.flatMap(g=>g.students);
             const allPayments=allStudents.flatMap(st=>st.payments);
@@ -509,33 +519,46 @@ function PaymentSummary({groups}){
             const bdEntries=Object.entries(breakdown).sort((a,b)=>Number(b[0])-Number(a[0]));
 
             return(
-              <div key={`${year}-${month}`} style={{borderBottom:`1px solid ${G2}`,padding:"16px 20px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                  <span style={{color:TXT,fontWeight:800,fontSize:15}}>{MONTHS[month]} {year}</span>
-                  <span style={{color:G1,fontSize:12}}>{mg.length} groups · {allStudents.length} students</span>
-                </div>
-                {/* Key figures */}
-                <div style={{display:"flex",flexWrap:"wrap",gap:0,marginBottom:12,background:BG3,borderRadius:10,overflow:"hidden"}}>
-                  {[["TOTAL BILLED",fmt(totalDue),TXT],["COLLECTED",fmt(totalPaid),"#000"],["UNCOLLECTED",fmt(uncollected),"#c00"],[`YOUR (${TEACHER_PCT}%)`,fmt(totalPaid*(TEACHER_PCT/100)),"#000"]].map(([l,v,c],i,arr)=>(
-                    <div key={l} style={{flex:"1 1 100px",padding:"10px 14px",borderRight:i<arr.length-1?`1px solid ${G2}`:"none"}}>
-                      <div style={{color:G1,fontSize:10,fontWeight:700,letterSpacing:"0.06em",marginBottom:3}}>{l}</div>
-                      <div style={{color:c,fontWeight:800,fontSize:13}}>{v}</div>
+              <div key={key} style={{borderBottom:`1px solid ${G2}`}}>
+                <div onClick={()=>toggleMonth(key)} className="tap" style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",cursor:"pointer"}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{color:TXT,fontWeight:800,fontSize:15}}>{MONTHS[month]} {year}</div>
+                    <div style={{color:G1,fontSize:12,marginTop:2}}>{mg.length} groups · {allStudents.length} students</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{color:G1,fontSize:9.5,fontWeight:700,letterSpacing:"0.05em"}}>COLLECTED</div>
+                      <div style={{color:TXT,fontWeight:800,fontSize:14}}>{fmt(totalPaid)}</div>
                     </div>
-                  ))}
+                    <span style={{color:G1,fontSize:16}}>{isExp?"▲":"▼"}</span>
+                  </div>
                 </div>
-                {/* Payment breakdown */}
-                {bdEntries.length>0&&(
-                  <div>
-                    <div style={{color:G1,fontSize:11,fontWeight:700,letterSpacing:"0.07em",marginBottom:8}}>PAYMENT BREAKDOWN</div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                      {bdEntries.map(([amt,cnt])=>(
-                        <div key={amt} style={{background:Y,borderRadius:8,padding:"5px 12px",display:"flex",alignItems:"center",gap:6}}>
-                          <span style={{color:"#000",fontWeight:700,fontSize:13}}>{fmtShort(Number(amt))}</span>
-                          <span style={{color:"#00000088",fontSize:11}}>×{cnt}</span>
-                          <span style={{color:"#444",fontSize:11}}>= {fmtShort(Number(amt)*cnt)}</span>
+                {isExp&&(
+                  <div style={{padding:"0 20px 18px"}}>
+                    {/* Key figures */}
+                    <div style={{display:"flex",flexWrap:"wrap",gap:0,marginBottom:12,background:BG3,borderRadius:10,overflow:"hidden"}}>
+                      {[["TOTAL BILLED",fmt(totalDue),TXT],["COLLECTED",fmt(totalPaid),"#000"],["UNCOLLECTED",fmt(uncollected),"#c00"],[`YOUR (${TEACHER_PCT}%)`,fmt(totalPaid*(TEACHER_PCT/100)),"#000"]].map(([l,v,c],i,arr)=>(
+                        <div key={l} style={{flex:"1 1 100px",padding:"10px 14px",borderRight:i<arr.length-1?`1px solid ${G2}`:"none"}}>
+                          <div style={{color:G1,fontSize:10,fontWeight:700,letterSpacing:"0.06em",marginBottom:3}}>{l}</div>
+                          <div style={{color:c,fontWeight:800,fontSize:13}}>{v}</div>
                         </div>
                       ))}
                     </div>
+                    {/* Payment breakdown */}
+                    {bdEntries.length>0&&(
+                      <div>
+                        <div style={{color:G1,fontSize:11,fontWeight:700,letterSpacing:"0.07em",marginBottom:8}}>PAYMENT BREAKDOWN</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                          {bdEntries.map(([amt,cnt])=>(
+                            <div key={amt} style={{background:Y,borderRadius:8,padding:"5px 12px",display:"flex",alignItems:"center",gap:6}}>
+                              <span style={{color:"#000",fontWeight:700,fontSize:13}}>{fmtShort(Number(amt))}</span>
+                              <span style={{color:"#00000088",fontSize:11}}>×{cnt}</span>
+                              <span style={{color:"#444",fontSize:11}}>= {fmtShort(Number(amt)*cnt)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -547,9 +570,96 @@ function PaymentSummary({groups}){
   );
 }
 
+// ── Newcomer Modal ──
+function NewcomerModal({newcomer,groupNames,onSave,onClose}){
+  const isNew=!newcomer;
+  const[d,setD]=useState(()=>newcomer?{...newcomer}:{id:uid(),name:"",groupName:"",contact:"",arrivalDate:new Date().toISOString().slice(0,10)});
+  const valid=d.name.trim().length>0;
+  return(
+    <Overlay onClose={onClose}>
+      <div style={{fontWeight:800,fontSize:19,color:TXT,marginBottom:18}}>{isNew?"New Newcomer":"Edit Newcomer"}</div>
+      <Lbl>Student Name</Lbl>
+      <Inp autoFocus placeholder="Student name" value={d.name} onChange={e=>setD(x=>({...x,name:e.target.value}))} style={{marginBottom:18}}/>
+      <Lbl>Group</Lbl>
+      <Inp list="newcomer-group-names" placeholder="e.g. Even 13:00" value={d.groupName} onChange={e=>setD(x=>({...x,groupName:e.target.value}))} style={{marginBottom:18}}/>
+      <datalist id="newcomer-group-names">
+        {groupNames.map(n=><option key={n} value={n}/>)}
+      </datalist>
+      <Lbl>Contact Info</Lbl>
+      <Inp placeholder="Phone number" value={d.contact} onChange={e=>setD(x=>({...x,contact:e.target.value}))} style={{marginBottom:18}}/>
+      <Lbl>Date of Arrival</Lbl>
+      <Inp type="date" value={d.arrivalDate} onChange={e=>setD(x=>({...x,arrivalDate:e.target.value}))} style={{marginBottom:24}}/>
+      <div style={{display:"flex",gap:10}}>
+        <OutBtn onClick={onClose} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
+        <YBtn onClick={()=>valid&&onSave(d)} style={{flex:2,textAlign:"center",opacity:valid?1:.5}}>Save</YBtn>
+      </div>
+    </Overlay>
+  );
+}
+
+// ── Newcomers View ──
+function NewcomersView({newcomers,groups,onBack,onAdd,onUpdate,onDelete}){
+  const[editItem,setEditItem]=useState(null);
+  const[adding,setAdding]=useState(false);
+  const[delItem,setDelItem]=useState(null);
+  const[menuItem,setMenuItem]=useState(null);
+
+  const groupNames=useMemo(()=>{
+    const seen=new Set();
+    groups.forEach(g=>seen.add(g.name));
+    return Array.from(seen).sort();
+  },[groups]);
+
+  const sorted=useMemo(()=>newcomers.slice().sort((a,b)=>(b.arrivalDate||"").localeCompare(a.arrivalDate||"")),[newcomers]);
+
+  const fmtDate=(s)=>{
+    if(!s)return"—";
+    const dt=new Date(s+"T00:00:00");
+    if(isNaN(dt))return s;
+    return dt.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+  };
+
+  return(
+    <div style={{paddingBottom:80}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <BackBtn onClick={onBack}/>
+        <div style={{flex:1,minWidth:0}}>
+          <h2 style={{margin:0,color:TXT,fontSize:21,fontWeight:800}}>Newcomers</h2>
+          <div style={{color:G1,fontSize:13}}>{newcomers.length} student{newcomers.length!==1?"s":""}</div>
+        </div>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {sorted.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2}}>No newcomers yet.<br/>Tap <b>+ Newcomer</b> to add one.</div>}
+        {sorted.map(nc=>(
+          <div key={nc.id} onClick={()=>setEditItem(nc)} className="tap" style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,boxShadow:SH1,cursor:"pointer"}}>
+            <div style={{width:42,height:42,borderRadius:"50%",background:BG3,border:`2px solid ${G2}`,display:"flex",alignItems:"center",justifyContent:"center",color:TXT,fontWeight:800,fontSize:17,flexShrink:0}}>
+              {(nc.name||"?").charAt(0).toUpperCase()}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:TXT,fontWeight:700,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nc.name||"Unnamed"}</div>
+              <div style={{color:G1,fontSize:12.5,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nc.groupName||"No group"} · {nc.contact||"No contact"}</div>
+            </div>
+            <div style={{color:G1,fontSize:11,fontWeight:700,flexShrink:0,textAlign:"right"}}>{fmtDate(nc.arrivalDate)}</div>
+            <IconBtn onClick={e=>{e.stopPropagation();setMenuItem(nc);}} label="More options" style={{fontSize:22,fontWeight:800}}>⋯</IconBtn>
+          </div>
+        ))}
+      </div>
+      <FAB onClick={()=>setAdding(true)} label="Add newcomer">+ Newcomer</FAB>
+      {adding&&<NewcomerModal groupNames={groupNames} onSave={n=>{onAdd(n);setAdding(false);}} onClose={()=>setAdding(false)}/>}
+      {editItem&&<NewcomerModal newcomer={editItem} groupNames={groupNames} onSave={n=>{onUpdate(n);setEditItem(null);}} onClose={()=>setEditItem(null)}/>}
+      {menuItem&&<ActionSheet title={menuItem.name||"Newcomer"} subtitle="Choose an action" onClose={()=>setMenuItem(null)} actions={[
+        {icon:"✏️",label:"Edit newcomer",onClick:()=>{setEditItem(menuItem);setMenuItem(null);}},
+        {icon:"🗑",label:"Delete newcomer",danger:true,onClick:()=>{setDelItem(menuItem);setMenuItem(null);}},
+      ]}/>}
+      {delItem&&<Confirm title="Delete newcomer?" message={`"${delItem.name||"This entry"}" will be permanently removed.`} onConfirm={()=>{onDelete(delItem.id);setDelItem(null);}} onClose={()=>setDelItem(null)}/>}
+    </div>
+  );
+}
+
 // ── Main App ──
 function App(){
-  const[groups,setGroups]=useState(()=>{ const d=window._loadData(); return d||MARCH_DATA; });
+  const[groups,setGroups]=useState(()=>{ const d=window._loadData(SAVE_KEY); return(d&&d.length)?d:MARCH_DATA; });
+  const[newcomers,setNewcomers]=useState(()=>{ const d=window._loadData(NEWCOMERS_KEY); return d||[]; });
   const[view,setView]=useState("home");
   const[selMonth,setSelMonth]=useState(null);
   const[selGroup,setSelGroup]=useState(null);
@@ -562,11 +672,18 @@ function App(){
 
   // Auto-save
   useEffect(()=>{
-    window._saveData(groups);
+    window._saveData(SAVE_KEY,groups);
     setSaved(true);
     const t=setTimeout(()=>setSaved(false),1200);
     return()=>clearTimeout(t);
   },[groups]);
+
+  useEffect(()=>{
+    window._saveData(NEWCOMERS_KEY,newcomers);
+    setSaved(true);
+    const t=setTimeout(()=>setSaved(false),1200);
+    return()=>clearTimeout(t);
+  },[newcomers]);
 
   // Auto PDF on 5th of month
   useEffect(()=>{
@@ -590,6 +707,10 @@ function App(){
   const updGroup=useCallback(g=>setGroups(p=>p.map(x=>x.id===g.id?g:x)),[]);
   const addGroup=useCallback(g=>setGroups(p=>[...p,g]),[]);
   const delGroup=useCallback(id=>setGroups(p=>p.filter(x=>x.id!==id)),[]);
+
+  const addNewcomer=useCallback(n=>setNewcomers(p=>[...p,n]),[]);
+  const updNewcomer=useCallback(n=>setNewcomers(p=>p.map(x=>x.id===n.id?n:x)),[]);
+  const delNewcomer=useCallback(id=>setNewcomers(p=>p.filter(x=>x.id!==id)),[]);
 
   // Copy students from one month to a new month
   const openMonth=(targetMonth,targetYear,copyKey)=>{
@@ -634,7 +755,7 @@ function App(){
   };
 
   const doBackup=()=>{
-    const blob=new Blob([JSON.stringify(groups,null,2)],{type:"application/json"});
+    const blob=new Blob([JSON.stringify({groups,newcomers},null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
     const d=new Date();
@@ -650,8 +771,14 @@ function App(){
     reader.onload=(ev)=>{
       try{
         const parsed=JSON.parse(ev.target.result);
-        if(!Array.isArray(parsed))throw new Error();
-        setGroups(parsed);
+        if(Array.isArray(parsed)){
+          setGroups(parsed);
+        }else if(parsed&&Array.isArray(parsed.groups)){
+          setGroups(parsed.groups);
+          setNewcomers(Array.isArray(parsed.newcomers)?parsed.newcomers:[]);
+        }else{
+          throw new Error();
+        }
         setRestoreMsg("✓ Restored!");
         setTimeout(()=>setRestoreMsg(""),3000);
       }catch{
@@ -664,6 +791,19 @@ function App(){
   };
 
   // ── Routing ──
+  if(view==="newcomers"){
+    return(
+      <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
+        <div style={{maxWidth:760,margin:"0 auto"}}>
+          <NewcomersView newcomers={newcomers} groups={groups}
+            onBack={()=>setView("home")}
+            onAdd={addNewcomer} onUpdate={updNewcomer} onDelete={delNewcomer}/>
+        </div>
+        {saved&&<div style={{position:"fixed",bottom:"calc(26px + var(--safe-bottom))",left:"max(18px,var(--safe-left))",background:"#111",color:Y,borderRadius:20,padding:"7px 15px",fontSize:13,fontWeight:700,boxShadow:SH2,zIndex:901}}>✓ Saved</div>}
+      </div>
+    );
+  }
+
   if(view==="group"&&selGroup){
     const grp=groups.find(g=>g.id===selGroup);
     if(!grp){setView("month");return null;}
@@ -729,6 +869,16 @@ function App(){
             </div>
             <div style={{color:"#ffffff77",fontSize:11,fontWeight:700,marginTop:6,textAlign:"right"}}>{heroPct}% collected</div>
           </div>
+        </div>
+
+        {/* Newcomers — quick access to the new-student contact log */}
+        <div onClick={()=>setView("newcomers")} className="tap" style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:16,padding:"16px 18px",marginBottom:22,display:"flex",alignItems:"center",gap:14,cursor:"pointer",boxShadow:SH1}}>
+          <div style={{width:44,height:44,borderRadius:12,background:YSOFT,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>📇</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{color:TXT,fontWeight:800,fontSize:16}}>Newcomers</div>
+            <div style={{color:G1,fontSize:12.5,marginTop:2}}>{newcomers.length} student{newcomers.length!==1?"s":""} tracked</div>
+          </div>
+          <div style={{color:G1,fontSize:20,flexShrink:0}}>›</div>
         </div>
 
         {/* Months — single tap-through list with income built in */}
