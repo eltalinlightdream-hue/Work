@@ -1,12 +1,7 @@
-const CACHE = "myclasses-v4";
-const ASSETS = ["./", "./index.html", "./manifest.json",
-  "https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"
-];
+const CACHE = "myclasses-v5";
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(self.skipWaiting());
 });
 self.addEventListener("activate", e => {
   e.waitUntil(
@@ -15,10 +10,13 @@ self.addEventListener("activate", e => {
       .then(() => clients.claim())
   );
 });
+// Network-first: always try the latest deploy; fall back to cache only when offline.
 self.addEventListener("fetch", e => {
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
-    const clone = res.clone();
-    caches.open(CACHE).then(c => c.put(e.request, clone));
-    return res;
-  })));
+  e.respondWith(
+    fetch(e.request).then(res => {
+      const clone = res.clone();
+      caches.open(CACHE).then(c => c.put(e.request, clone));
+      return res;
+    }).catch(() => caches.match(e.request))
+  );
 });
