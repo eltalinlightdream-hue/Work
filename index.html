@@ -84,9 +84,26 @@ const R_CARD=16, R_BTN=12;
 
 // ── Performance helpers ──────────────────────────────────────────────
 const MONTHS_UZ=["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
-const HW_COLOR={done:Y,partial:PART,missed:BAD};
-// Tap cycle: unmarked → done → partial → missed → unmarked
-const nextHW=(s)=> s==null?"done" : s==="done"?"partial" : s==="partial"?"missed" : null;
+// Homework is made of types; each group pulls in 4-5 of these (or custom ones)
+const TYPE_PRESETS=["Listening","Reading","Speaking","Vocabulary","Essay","Grammar","Sentence making","Exercises"];
+const TYPE_ICON={Listening:"🎧",Reading:"📖",Speaking:"🗣️",Vocabulary:"📚",Essay:"📝",Grammar:"✏️","Sentence making":"🔤",Exercises:"🧩"};
+const typeIcon=t=>TYPE_ICON[t]||"📌";
+const DEFAULT_TYPES=["Listening","Reading","Vocabulary","Grammar"];
+// Types in effect for a lesson: per-date override, else month default
+const lessonTypes=(gp,date)=>{ const ls=(gp.lessons||{})[date]; return (ls&&ls.types&&ls.types.length)?ls.types:(gp.types&&gp.types.length?gp.types:DEFAULT_TYPES); };
+// A record is either a legacy string ("done"/"partial"/"missed") or a map {Type:true|false}
+function recStat(rec){
+  if(rec==null)return null;
+  if(typeof rec==="string"){
+    const f=rec==="done"?1:rec==="partial"?0.5:0;
+    return {fraction:f,status:rec,done:f===1?1:0,total:1,legacy:true};
+  }
+  const keys=Object.keys(rec); if(!keys.length)return null;
+  const t=keys.filter(k=>rec[k]).length, f=t/keys.length;
+  return {fraction:f,status:f===1?"done":f===0?"missed":"partial",done:t,total:keys.length,legacy:false};
+}
+// Missed type names of a typed record (for report chips)
+const missedTypes=(rec)=>(rec&&typeof rec==="object")?Object.keys(rec).filter(k=>!rec[k]):[];
 const scheduleFromName=(name="")=>/odd/i.test(name)?"odd":"even";
 const iso=(y,m,d)=>`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 // Even/odd calendar-day dates for a given month
@@ -133,42 +150,59 @@ function rosterByPid(groups){
   }));
   return m;
 }
+// % helpers over fraction sums (a typed record contributes its done-share, e.g. 3/5)
+const fracPct=(sum,count)=>count?Math.round((sum/count)*100):0;
+// Add a typed record's per-type results into a {Type:{done,total}} accumulator
+function addTypeTotals(acc,rec){
+  if(!rec||typeof rec!=="object")return;
+  Object.entries(rec).forEach(([t,v])=>{ if(!acc[t])acc[t]={done:0,total:0}; acc[t].total++; if(v)acc[t].done++; });
+}
 // Aggregate homework across every group sharing a name, within a date window
 function groupReport(groups,perf,groupName,win){
-  const lessons=[]; const perStudent={};
+  const lessons=[]; const perStudent={}; const types={};
   groups.filter(g=>g.name===groupName).forEach(g=>{
     const gp=perf[g.id]; if(!gp)return;
     const nameByPid={}; g.students.forEach(st=>nameByPid[st.pid||st.id]=st.name);
     Object.entries(gp.lessons||{}).forEach(([date,ls])=>{
       if(!inRange(date,win))return;
-      let d=0,p=0,m=0;
+      let d=0,p=0,m=0,fs=0,c=0;
       Object.entries(ls.records||{}).forEach(([pid,v])=>{
-        if(!perStudent[pid])perStudent[pid]={pid,name:nameByPid[pid]||"?",done:0,partial:0,missed:0};
-        if(v==="done"){d++;perStudent[pid].done++;}
-        else if(v==="partial"){p++;perStudent[pid].partial++;}
-        else if(v==="missed"){m++;perStudent[pid].missed++;}
+        const rs=recStat(v); if(!rs)return;
+        if(!perStudent[pid])perStudent[pid]={pid,name:nameByPid[pid]||"?",done:0,partial:0,missed:0,fracSum:0,count:0};
+        const ps=perStudent[pid];
+        ps[rs.status]++; ps.fracSum+=rs.fraction; ps.count++;
+        if(rs.status==="done")d++; else if(rs.status==="partial")p++; else m++;
+        fs+=rs.fraction; c++;
+        addTypeTotals(types,v);
       });
-      if(d+p+m>0)lessons.push({date,done:d,partial:p,missed:m});
+      if(c>0)lessons.push({date,done:d,partial:p,missed:m,rate:fracPct(fs,c)});
     });
   });
   lessons.sort((a,b)=>a.date.localeCompare(b.date));
-  const totals=lessons.reduce((t,l)=>({done:t.done+l.done,partial:t.partial+l.partial,missed:t.missed+l.missed}),{done:0,partial:0,missed:0});
-  return {lessons,perStudent:Object.values(perStudent),totals};
+  const students=Object.values(perStudent).map(s=>({...s,rate:fracPct(s.fracSum,s.count)}));
+  const totals=students.reduce((t,s)=>({done:t.done+s.done,partial:t.partial+s.partial,missed:t.missed+s.missed,fracSum:t.fracSum+s.fracSum,count:t.count+s.count}),{done:0,partial:0,missed:0,fracSum:0,count:0});
+  totals.rate=fracPct(totals.fracSum,totals.count);
+  return {lessons,perStudent:students,totals,types};
 }
 // One person's homework history within a window
 function studentReport(groups,perf,pid,win){
-  const lessons=[];
+  const lessons=[]; const types={};
   groups.forEach(g=>{
     const gp=perf[g.id]; if(!gp)return;
     if(!g.students.some(st=>(st.pid||st.id)===pid))return;
     Object.entries(gp.lessons||{}).forEach(([date,ls])=>{
       if(!inRange(date,win))return;
-      lessons.push({date,homework:(ls.homework||gp.defaultHomework||""),status:(ls.records||{})[pid],groupName:g.name});
+      const rec=(ls.records||{})[pid];
+      const rs=recStat(rec);
+      if(rs)addTypeTotals(types,rec);
+      lessons.push({date,homework:(ls.homework||gp.defaultHomework||""),types:lessonTypes(gp,date),rec,
+        status:rs?rs.status:undefined,fraction:rs?rs.fraction:null,stat:rs,groupName:g.name});
     });
   });
   lessons.sort((a,b)=>a.date.localeCompare(b.date));
-  const totals=lessons.reduce((t,l)=>{ if(l.status==="done")t.done++; else if(l.status==="partial")t.partial++; else if(l.status==="missed")t.missed++; return t; },{done:0,partial:0,missed:0});
-  return {lessons,totals};
+  const totals=lessons.reduce((t,l)=>{ if(l.stat){t[l.stat.status]++;t.fracSum+=l.stat.fraction;t.count++;} return t; },{done:0,partial:0,missed:0,fracSum:0,count:0});
+  totals.rate=fracPct(totals.fracSum,totals.count);
+  return {lessons,totals,types};
 }
 
 // ── Bilingual labels for PDF export ──────────────────────────────────
@@ -182,6 +216,8 @@ const LABELS={
     uncollected:"Uncollected",yourIncome:"Your Income",centerShare:"Center Share",paymentBreakdown:"Payment Amount Breakdown",
     amount:"Amount",count:"Count",subtotal:"Subtotal",totalDue:"Total Due",paid:"Paid",remaining:"Remaining",
     paidStatus:"PAID",unpaidStatus:"UNPAID",collected:"Collected",total:"Total",metric:"Metric",value:"Value",
+    byType:"By homework type",weakest:"Weakest skill",
+    types:{Listening:"Listening",Reading:"Reading",Speaking:"Speaking",Vocabulary:"Vocabulary",Essay:"Essay",Grammar:"Grammar","Sentence making":"Sentence making",Exercises:"Exercises"},
     months:MONTHS,ranges:{week:"This week",month:"This month","3mo":"Last 3 months","6mo":"Last 6 months"}},
   uz:{code:"uz",appTitle:"Mening sinflarim",generated:"Yaratilgan",group:"Guruh",student:"O'quvchi",students:"O'quvchilar",
     homework:"Uy vazifasi",lesson:"Dars",date:"Sana",status:"Holat",done:"Bajardi",partial:"Qisman",missed:"Bajarmadi",
@@ -192,9 +228,12 @@ const LABELS={
     uncollected:"Yig'ilmagan",yourIncome:"Sizning daromadingiz",centerShare:"Markaz ulushi",paymentBreakdown:"To'lov miqdorlari",
     amount:"Miqdor",count:"Soni",subtotal:"Jami",totalDue:"Jami to'lov",paid:"To'langan",remaining:"Qoldi",
     paidStatus:"TO'LANGAN",unpaidStatus:"TO'LANMAGAN",collected:"Yig'ilgan",total:"Jami",metric:"Ko'rsatkich",value:"Qiymat",
+    byType:"Vazifa turlari bo'yicha",weakest:"Eng zaif ko'nikma",
+    types:{Listening:"Tinglash",Reading:"O'qish",Speaking:"Gapirish",Vocabulary:"Lug'at",Essay:"Insho",Grammar:"Grammatika","Sentence making":"Gap tuzish",Exercises:"Mashqlar"},
     months:MONTHS_UZ,ranges:{week:"Bu hafta",month:"Bu oy","3mo":"Oxirgi 3 oy","6mo":"Oxirgi 6 oy"}}
 };
 const monthLabel=(month,year,lang="en")=>`${(LABELS[lang]||LABELS.en).months[month]} ${year}`;
+const typeLabel=(t,lang="en")=>((LABELS[lang]||LABELS.en).types||{})[t]||t;
 let LAST_LANG=(()=>{ try{return localStorage.getItem("myClassesLang")||"en";}catch(e){return "en";} })();
 
 const makeStudent=(name="")=>({
@@ -318,8 +357,8 @@ function generatePerformancePDF(groups, perf, groupName, month, year, rangeKind,
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
   const win=rangeWindow(rangeKind,refDateFor(month,year));
-  const {lessons,perStudent,totals}=groupReport(groups,perf,groupName,win);
-  const rate=pct(totals.done,totals.partial,totals.missed);
+  const {lessons,perStudent,totals,types}=groupReport(groups,perf,groupName,win);
+  const rate=totals.rate;
 
   doc.setFontSize(16);doc.setFont("helvetica","bold");
   doc.text(`${groupName} — ${L.performanceReport}`,14,16);
@@ -340,13 +379,30 @@ function generatePerformancePDF(groups, perf, groupName, month, year, rangeKind,
   });
   let y=doc.lastAutoTable.finalY+10;
 
-  const bars=perStudent.map(s=>({label:s.name,value:pct(s.done,s.partial,s.missed)})).sort((a,b)=>b.value-a.value);
+  // Skill breakdown — completion % per homework type
+  const typeBars=Object.entries(types).filter(([,v])=>v.total>0)
+    .map(([t,v])=>({label:typeLabel(t,lang),value:Math.round(v.done/v.total*100)})).sort((a,b)=>b.value-a.value);
+  if(typeBars.length){
+    doc.setFont("helvetica","bold");doc.setFontSize(11);doc.text(L.byType,14,y);y+=6;
+    y=pdfBars(doc,14,y,182,typeBars)+4;
+    const weakest=typeBars[typeBars.length-1];
+    if(typeBars.length>=2&&weakest.value<70){
+      doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(229,72,77);
+      doc.text(`${L.weakest}: ${weakest.label} (${weakest.value}%)`,14,y);
+      doc.setTextColor(0);y+=6;
+    }
+    y+=4;
+  }
+
+  const bars=perStudent.map(s=>({label:s.name,value:s.rate})).sort((a,b)=>b.value-a.value);
   if(bars.length){
+    if(y>230){doc.addPage();y=20;}
     doc.setFont("helvetica","bold");doc.setFontSize(11);doc.text(`${L.rate} · ${L.students}`,14,y);y+=6;
     y=pdfBars(doc,14,y,182,bars)+6;
   }
 
-  const rows=perStudent.sort((a,b)=>a.name.localeCompare(b.name)).map(s=>[s.name,String(s.done),String(s.partial),String(s.missed),`${pct(s.done,s.partial,s.missed)}%`]);
+  if(y>240){doc.addPage();y=20;}
+  const rows=perStudent.sort((a,b)=>a.name.localeCompare(b.name)).map(s=>[s.name,String(s.done),String(s.partial),String(s.missed),`${s.rate}%`]);
   doc.autoTable({
     startY:y, head:[[L.student,L.done,L.partial,L.missed,L.rate]],
     body:rows,styles:{fontSize:9},headStyles:HEAD_STYLE,
@@ -363,8 +419,8 @@ function generateStudentPDF(groups, perf, portfolios, pid, name, groupName, mont
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
   const win=rangeWindow(rangeKind,refDateFor(month,year));
-  const {lessons,totals}=studentReport(groups,perf,pid,win);
-  const rate=pct(totals.done,totals.partial,totals.missed);
+  const {lessons,totals,types}=studentReport(groups,perf,pid,win);
+  const rate=totals.rate;
   const p=portfolios[pid]||{};
 
   doc.setFontSize(16);doc.setFont("helvetica","bold");
@@ -384,14 +440,34 @@ function generateStudentPDF(groups, perf, portfolios, pid, name, groupName, mont
   });
   let y=doc.lastAutoTable.finalY+10;
 
-  const pts=lessons.map(l=>l.status==="done"?100:l.status==="partial"?50:0);
+  // Skill breakdown — completion % per homework type
+  const typeBars=Object.entries(types).filter(([,v])=>v.total>0)
+    .map(([t,v])=>({label:typeLabel(t,lang),value:Math.round(v.done/v.total*100)})).sort((a,b)=>b.value-a.value);
+  if(typeBars.length){
+    doc.setFont("helvetica","bold");doc.setFontSize(11);doc.text(L.byType,14,y);y+=6;
+    y=pdfBars(doc,14,y,182,typeBars)+8;
+  }
+
+  const marked=lessons.filter(l=>l.stat);
+  const pts=marked.map(l=>Math.round(l.stat.fraction*100));
   if(pts.length){
+    if(y>200){doc.addPage();y=20;}
     doc.setFont("helvetica","bold");doc.setFontSize(11);doc.text(`${L.homeworkRate}`,14,y);y+=4;
     pdfLine(doc,14,y,182,34,pts);y+=42;
   }
 
-  const stTxt={done:L.done,partial:L.partial,missed:L.missed};
-  const rows=lessons.slice().reverse().map(l=>[shortDate(l.date,lang),(l.homework||"—").slice(0,48),stTxt[l.status]||L.unmarked]);
+  if(y>240){doc.addPage();y=20;}
+  const rows=lessons.slice().reverse().map(l=>{
+    const rs=l.stat;
+    const status=!rs?L.unmarked
+      :rs.fraction===1?L.done
+      :rs.fraction===0?L.missed
+      :rs.legacy?L.partial:`${rs.done}/${rs.total}`;
+    const miss=missedTypes(l.rec).map(t=>typeLabel(t,lang));
+    const hwTxt=(l.homework||(l.types||[]).map(t=>typeLabel(t,lang)).join(", ")||"—").slice(0,44);
+    const detail=(rs&&rs.fraction>0&&rs.fraction<1&&miss.length)?`${hwTxt}  (✗ ${miss.join(", ").slice(0,40)})`:hwTxt;
+    return[shortDate(l.date,lang),detail,status];
+  });
   doc.autoTable({
     startY:y, head:[[L.date,L.homework,L.status]],
     body:rows,styles:{fontSize:9},headStyles:HEAD_STYLE,margin:{left:14,right:14},
@@ -555,9 +631,11 @@ function LangPicker({title,onPick,onClose}){
   );
 }
 
-// ── Student Modal (no personal info) ──
-function StudentModal({student,onSave,onClose}){
+// ── Student Modal — payments (unchanged) + student information ──
+function StudentModal({student,onSave,onClose,info={},onSaveInfo,hw,onOpenReport}){
   const[d,setD]=useState({...student,payments:student.payments.map(p=>({...p}))});
+  const[editInfo,setEditInfo]=useState(false);
+  const INFO_FIELDS=[["gradeYear","Course year"],["studyPlace","Place of study"],["livingPlace","Lives in"],["studentPhone","Student phone"],["parentPhone","Parent phone"]];
   const updP=(i,f,v)=>setD(x=>({...x,payments:x.payments.map((p,j)=>j===i?{...p,[f]:v}:p)}));
   const addP=()=>setD(x=>({...x,payments:[...x.payments,{id:uid(),label:"Additional payment",amount:0,paid:false}]}));
   const delP=i=>setD(x=>({...x,payments:x.payments.filter((_,j)=>j!==i)}));
@@ -601,16 +679,41 @@ function StudentModal({student,onSave,onClose}){
         </div>
       ))}
       <OutBtn onClick={addP} style={{width:"100%",textAlign:"center",margin:"4px 0 24px",borderStyle:"dashed",color:G1}}>+ Add Extra Payment</OutBtn>
+
+      {/* Student information — lives with the payment details, not a separate section */}
+      {onSaveInfo&&(
+        <div style={{borderTop:`2px solid ${G2}`,paddingTop:16,marginBottom:24}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,gap:8}}>
+            <Lbl>🗂️ Student information</Lbl>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0,marginBottom:8}}>
+              {hw&&hw.count>0&&<span style={{background:hw.rate>=80?"#E3F5EA":hw.rate>=60?"#FFF3DC":"#FDECEC",color:hw.rate>=80?GOOD:hw.rate>=60?"#B8770B":BAD,borderRadius:20,padding:"4px 10px",fontSize:11,fontWeight:800}}>HW {hw.rate}%</span>}
+              {onOpenReport&&<button onClick={onOpenReport} style={{background:"none",border:"none",color:YD,fontWeight:800,fontSize:12.5,cursor:"pointer",padding:0}}>📊 Report ›</button>}
+            </div>
+          </div>
+          <div style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:14,padding:"2px 14px",marginBottom:12}}>
+            {INFO_FIELDS.map(([k,l],i)=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"11px 0",borderBottom:i<INFO_FIELDS.length-1||info.notes?`1px solid ${G2}`:"none"}}>
+                <span style={{color:G1,fontSize:13.5,flexShrink:0}}>{l}</span>
+                <span style={{fontWeight:700,fontSize:13.5,textAlign:"right",color:info[k]?TXT:G2,overflow:"hidden",textOverflow:"ellipsis"}}>{info[k]||"—"}</span>
+              </div>
+            ))}
+            {info.notes&&<div style={{padding:"11px 0"}}><div style={{color:G1,fontSize:13.5,marginBottom:4}}>Notes</div><div style={{fontWeight:600,fontSize:13.5,lineHeight:1.5}}>{info.notes}</div></div>}
+          </div>
+          <OutBtn onClick={()=>setEditInfo(true)} style={{width:"100%",textAlign:"center",fontSize:14}}>✎ Edit information</OutBtn>
+        </div>
+      )}
+
       <div style={{display:"flex",gap:10,position:"sticky",bottom:0,background:BG2,paddingTop:4}}>
         <OutBtn onClick={onClose} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
         <YBtn onClick={()=>onSave(d)} style={{flex:2,textAlign:"center"}}>Save Changes</YBtn>
       </div>
+      {editInfo&&<PortfolioEditModal name={d.name||"Student"} data={info} onSave={(v)=>{onSaveInfo(v);setEditInfo(false);}} onClose={()=>setEditInfo(false)}/>}
     </Overlay>
   );
 }
 
 // ── Group View ──
-function GroupView({group,monthLabel,onBack,onUpdate}){
+function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfolio,hwRateFor,onOpenStudentReport}){
   const[editSt,setEditSt]=useState(null);
   const[adding,setAdding]=useState(false);
   const[nm,setNm]=useState("");
@@ -685,8 +788,15 @@ function GroupView({group,monthLabel,onBack,onUpdate}){
         {icon:"✏️",label:"Edit student",onClick:()=>{setEditSt(menuSt);setMenuSt(null);}},
         {icon:"🗑",label:"Delete student",danger:true,onClick:()=>{setDelSt(menuSt);setMenuSt(null);}},
       ]}/>}
-      {delSt&&<Confirm title="Delete student?" message={`"${delSt.name||"This student"}" will be removed from Payments, Performance and Portfolio — including all homework history and personal info.`} onConfirm={()=>{removeSt(delSt.id);setDelSt(null);}} onClose={()=>setDelSt(null)}/>}
-      {editSt&&<StudentModal student={editSt} onSave={saveSt} onClose={()=>setEditSt(null)}/>}
+      {delSt&&<Confirm title="Delete student?" message={`"${delSt.name||"This student"}" will be removed from Payments and Performance — including payment records, homework history and personal info.`} onConfirm={()=>{removeSt(delSt.id);setDelSt(null);}} onClose={()=>setDelSt(null)}/>}
+      {editSt&&(()=>{
+        const pid=editSt.pid||editSt.id;
+        return <StudentModal student={editSt} onSave={saveSt} onClose={()=>setEditSt(null)}
+          info={portfolios[pid]||{}}
+          onSaveInfo={onSavePortfolio?(v)=>onSavePortfolio(pid,v):undefined}
+          hw={hwRateFor?hwRateFor(pid):undefined}
+          onOpenReport={onOpenStudentReport?()=>{setEditSt(null);onOpenStudentReport(pid);}:undefined}/>;
+      })()}
     </div>
   );
 }
@@ -968,10 +1078,13 @@ function NewcomersView({newcomers,groups,onBack,onAdd,onUpdate,onDelete}){
 
 // Quick per-group homework tally for one month's group record
 function groupTally(perf,g){
-  let done=0,partial=0,missed=0; const gp=perf[g.id];
+  let done=0,partial=0,missed=0,fs=0,c=0; const gp=perf[g.id];
   if(gp)Object.values(gp.lessons||{}).forEach(ls=>Object.values(ls.records||{}).forEach(v=>{
-    if(v==="done")done++;else if(v==="partial")partial++;else if(v==="missed")missed++;}));
-  return {done,partial,missed,rate:pct(done,partial,missed),lessons:gp?Object.keys(gp.lessons||{}).length:0};
+    const rs=recStat(v); if(!rs)return;
+    if(rs.status==="done")done++;else if(rs.status==="partial")partial++;else missed++;
+    fs+=rs.fraction;c++;
+  }));
+  return {done,partial,missed,rate:fracPct(fs,c),lessons:gp?Object.keys(gp.lessons||{}).length:0};
 }
 
 // Performance section home — groups of a month + center-wide rate
@@ -1040,31 +1153,123 @@ function PerformanceHome({monthIdx,year,groups,perf,activeMonths,onBack,onOpenGr
   );
 }
 
-// Homework grid — mark each student per lesson + manage lessons/homework
+// Type list + note editor — used for the month default and per-lesson overrides
+function TypesEditor({title,subtitle,initialTypes,initialNote,resetLabel,onReset,onSave,onClose}){
+  const[sel,setSel]=useState(()=>initialTypes.slice());
+  const[note,setNote]=useState(initialNote||"");
+  const[custom,setCustom]=useState("");
+  const toggleT=(t)=>setSel(s=>s.includes(t)?s.filter(x=>x!==t):[...s,t]);
+  const addCustom=()=>{ const t=custom.trim(); if(!t||sel.includes(t))return; setSel(s=>[...s,t]); setCustom(""); };
+  const all=[...TYPE_PRESETS,...sel.filter(t=>!TYPE_PRESETS.includes(t))];
+  return(
+    <Overlay onClose={onClose}>
+      <div style={{fontWeight:800,fontSize:19,color:TXT,marginBottom:4}}>{title}</div>
+      <div style={{color:G1,fontSize:13,marginBottom:16}}>{subtitle}</div>
+      <Lbl>Homework types · tap to select</Lbl>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
+        {all.map(t=>{
+          const on=sel.includes(t);
+          return(
+            <button key={t} onClick={()=>toggleT(t)} style={{display:"inline-flex",alignItems:"center",gap:6,background:on?Y:BG3,border:`1.5px solid ${on?YD:G2}`,borderRadius:10,padding:"9px 13px",fontSize:13.5,fontWeight:800,color:on?"#000":G1,cursor:"pointer"}}>
+              {typeIcon(t)} {t} {on&&"✓"}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        <Inp placeholder="Custom type (e.g. Dictation)" value={custom} onChange={e=>setCustom(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustom()}/>
+        <OutBtn onClick={addCustom} style={{whiteSpace:"nowrap"}}>+ Add</OutBtn>
+      </div>
+      <Lbl>Note (optional)</Lbl>
+      <textarea value={note} onChange={e=>setNote(e.target.value)} rows={2} placeholder="e.g. Workbook p.40–41" style={{width:"100%",background:BG3,border:`1.5px solid ${G2}`,borderRadius:R_BTN,color:TXT,padding:"13px 14px",fontSize:16,outline:"none",resize:"vertical",marginBottom:18}}/>
+      {resetLabel&&<OutBtn onClick={onReset} style={{width:"100%",textAlign:"center",marginBottom:12,borderStyle:"dashed",color:G1}}>{resetLabel}</OutBtn>}
+      <div style={{display:"flex",gap:10}}>
+        <OutBtn onClick={onClose} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
+        <YBtn onClick={()=>sel.length&&onSave(sel,note.trim())} style={{flex:2,textAlign:"center",opacity:sel.length?1:.5}}>Save</YBtn>
+      </div>
+    </Overlay>
+  );
+}
+
+// Per-student checklist for one lesson — tick exactly what they did
+function MarkSheet({studentName,date,types,initialRec,onSave,onClear,onClose}){
+  const[m,setM]=useState(()=>{
+    const init={};
+    types.forEach(t=>{
+      if(initialRec&&typeof initialRec==="object")init[t]=!!initialRec[t];
+      else init[t]=initialRec==="done";
+    });
+    return init;
+  });
+  const doneCount=types.filter(t=>m[t]).length;
+  const setAll=(v)=>setM(()=>{ const n={}; types.forEach(t=>n[t]=v); return n; });
+  const hasRec=initialRec!=null;
+  return(
+    <Overlay onClose={onClose}>
+      <div style={{fontWeight:800,fontSize:19,color:TXT}}>{studentName}</div>
+      <div style={{color:G1,fontSize:13,marginTop:2,marginBottom:16}}>{shortDate(date)} · tick what they did</div>
+      <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:16}}>
+        {types.map(t=>{
+          const on=!!m[t];
+          return(
+            <button key={t} onClick={()=>setM(x=>({...x,[t]:!on}))} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:on?YSOFT:"#FDECEC",border:`1.5px solid ${on?YD:"#F6C9CA"}`,borderRadius:12,padding:"13px 14px",cursor:"pointer",width:"100%"}}>
+              <span style={{fontWeight:700,fontSize:15,color:on?"#5a4a00":BAD}}>{typeIcon(t)} {t}</span>
+              <span style={{width:34,height:34,borderRadius:10,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,background:on?Y:"#fff",color:on?"#000":BAD,border:on?"none":"1.5px solid #F6C9CA"}}>{on?"✓":"✗"}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:12}}>
+        <button onClick={()=>setAll(true)} style={{flex:1,background:YSOFT,border:`1.5px solid ${YD}`,borderRadius:12,padding:"12px 6px",fontWeight:800,fontSize:13.5,color:"#5a4a00",cursor:"pointer"}}>✓ All done</button>
+        <button onClick={()=>setAll(false)} style={{flex:1,background:"#FDECEC",border:"1.5px solid #F6C9CA",borderRadius:12,padding:"12px 6px",fontWeight:800,fontSize:13.5,color:BAD,cursor:"pointer"}}>✗ None</button>
+        {hasRec&&<button onClick={onClear} style={{flex:1,background:BG3,border:`1.5px solid ${G2}`,borderRadius:12,padding:"12px 6px",fontWeight:800,fontSize:13.5,color:G1,cursor:"pointer"}}>Clear mark</button>}
+      </div>
+      <div style={{display:"flex",gap:10}}>
+        <OutBtn onClick={onClose} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
+        <YBtn onClick={()=>onSave(m)} style={{flex:2,textAlign:"center"}}>Save · {doneCount}/{types.length} done</YBtn>
+      </div>
+    </Overlay>
+  );
+}
+
+// Homework grid — mark each student per lesson + manage lessons/homework types
 function HomeworkGrid({group,gp,monthIdx,year,onBack,onChange,onOpenReport,onOpenStudent}){
   const[tab,setTab]=useState("grid");
   const[editDefault,setEditDefault]=useState(false);
-  const[defVal,setDefVal]=useState(gp.defaultHomework||"");
   const[addOpen,setAddOpen]=useState(false);
   const[newDate,setNewDate]=useState(iso(year,monthIdx,1));
-  const[hwEdit,setHwEdit]=useState(null);   // date being edited
-  const[hwVal,setHwVal]=useState("");
+  const[hwEdit,setHwEdit]=useState(null);   // date whose types/note are being customised
   const[delDate,setDelDate]=useState(null);
+  const[markCell,setMarkCell]=useState(null); // {pid,name,date}
 
   const dates=Object.keys(gp.lessons||{}).sort();
-  const toggle=(pid,date)=>{
+  const monthTypes=(gp.types&&gp.types.length)?gp.types:DEFAULT_TYPES;
+  const isCustom=(d)=>{ const ls=gp.lessons[d]||{}; return !!((ls.types&&ls.types.length)||ls.homework); };
+
+  const saveMark=(m)=>{
+    const{pid,date}=markCell;
     const ls=gp.lessons[date]||{records:{}};
-    const cur=(ls.records||{})[pid]; const nx=nextHW(cur);
-    const records={...(ls.records||{})};
-    if(nx==null)delete records[pid]; else records[pid]=nx;
+    onChange({...gp,lessons:{...gp.lessons,[date]:{...ls,records:{...(ls.records||{}),[pid]:m}}}});
+    setMarkCell(null);
+  };
+  const clearMark=()=>{
+    const{pid,date}=markCell;
+    const ls=gp.lessons[date]||{records:{}};
+    const records={...(ls.records||{})}; delete records[pid];
     onChange({...gp,lessons:{...gp.lessons,[date]:{...ls,records}}});
+    setMarkCell(null);
   };
   const addLesson=()=>{ if(!newDate||gp.lessons[newDate]){setAddOpen(false);return;} onChange({...gp,lessons:{...gp.lessons,[newDate]:{records:{}}}}); setAddOpen(false); };
   const removeLesson=(date)=>{ const l={...gp.lessons}; delete l[date]; onChange({...gp,lessons:l}); setDelDate(null); };
-  const saveHw=()=>{ const ls={...(gp.lessons[hwEdit]||{records:{}})}; if(hwVal.trim())ls.homework=hwVal.trim(); else delete ls.homework; onChange({...gp,lessons:{...gp.lessons,[hwEdit]:ls}}); setHwEdit(null); };
-  const stColor=s=>s==="done"?"done":s==="missed"?"miss":s==="partial"?"part":"empty";
-  const cellStyle={done:{background:Y,color:"#000"},miss:{background:"#FDECEC",color:BAD,border:"1px solid #F6C9CA"},part:{background:"#FFF3DC",color:"#B8770B",border:"1px solid #F3D9A6"},empty:{background:BG3,color:G2,border:`1px solid ${G2}`}};
-  const glyph={done:"✓",miss:"✗",part:"◐",empty:""};
+
+  // Cell face from a record: ✓ all, ✗ none, n/m partly, ◐ legacy partial, blank unmarked
+  const cellFace=(rec)=>{
+    const rs=recStat(rec);
+    if(!rs)return{txt:"",style:{background:BG3,color:G2,border:`1px solid ${G2}`}};
+    if(rs.fraction===1)return{txt:"✓",style:{background:Y,color:"#000"}};
+    if(rs.fraction===0)return{txt:"✗",style:{background:"#FDECEC",color:BAD,border:"1px solid #F6C9CA"}};
+    return{txt:rs.legacy?"◐":`${rs.done}/${rs.total}`,style:{background:"#FFF3DC",color:"#B8770B",border:"1px solid #F3D9A6",fontSize:10.5}};
+  };
 
   return(
     <div style={{paddingBottom:90}}>
@@ -1077,14 +1282,16 @@ function HomeworkGrid({group,gp,monthIdx,year,onBack,onChange,onOpenReport,onOpe
         <button onClick={()=>onOpenReport(group.name)} aria-label="Report" style={{background:"#111",border:"none",borderRadius:12,color:"#fff",height:44,padding:"0 14px",cursor:"pointer",fontSize:14,fontWeight:700}}>📊</button>
       </div>
 
-      {/* month default homework */}
+      {/* month homework types */}
       <div style={{background:YSOFT,border:`1.5px solid ${YD}`,borderRadius:14,padding:"13px 15px",marginBottom:14}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{color:G1,fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase"}}>Month default homework</div>
-          <button onClick={()=>{setDefVal(gp.defaultHomework||"");setEditDefault(true);}} style={{background:"none",border:"none",color:YD,fontWeight:800,fontSize:12.5,cursor:"pointer"}}>Edit ✎</button>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+          <div style={{color:G1,fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase"}}>Homework types · this month</div>
+          <button onClick={()=>setEditDefault(true)} style={{background:"none",border:"none",color:YD,fontWeight:800,fontSize:12.5,cursor:"pointer"}}>Edit ✎</button>
         </div>
-        <div style={{fontSize:13.5,color:"#5a4a00",marginTop:6,lineHeight:1.45}}>{gp.defaultHomework||<span style={{color:"#8a7400",fontStyle:"italic"}}>Not set — tap Edit to add homework for the whole month.</span>}</div>
-        <div style={{fontSize:11,color:"#8a7400",marginTop:6}}>Applies to every lesson unless a date is customised.</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {monthTypes.map(t=><span key={t} style={{display:"inline-flex",alignItems:"center",gap:5,background:Y,color:"#000",borderRadius:9,padding:"5px 11px",fontSize:12.5,fontWeight:800}}>{typeIcon(t)} {t}</span>)}
+        </div>
+        <div style={{fontSize:11,color:"#8a7400",marginTop:8}}>{gp.defaultHomework?`Note: ${gp.defaultHomework} · `:""}Any date can be customised (*)</div>
       </div>
 
       <Segmented value={tab} onChange={setTab} options={[{key:"grid",label:"Grid view"},{key:"lessons",label:"Lessons & homework"}]}/>
@@ -1099,25 +1306,25 @@ function HomeworkGrid({group,gp,monthIdx,year,onBack,onChange,onOpenReport,onOpe
               <thead>
                 <tr style={{background:BG3}}>
                   <th style={{textAlign:"left",padding:"10px 12px",fontSize:11,color:G1,position:"sticky",left:0,background:BG3,zIndex:1}}>Student</th>
-                  {dates.map(d=>(<th key={d} style={{padding:"8px 6px",fontSize:10.5,color:G1,whiteSpace:"nowrap"}}>{shortDate(d)}{gp.lessons[d].homework?<span style={{color:"#B8770B"}}>*</span>:""}</th>))}
+                  {dates.map(d=>(<th key={d} style={{padding:"8px 6px",fontSize:10.5,color:G1,whiteSpace:"nowrap"}}>{shortDate(d)}{isCustom(d)?<span style={{color:"#B8770B"}}>*</span>:""}</th>))}
                   <th style={{padding:"8px 8px",fontSize:11,color:G1}}>%</th>
                 </tr>
               </thead>
               <tbody>
                 {group.students.map((st,ri)=>{
                   const pid=st.pid||st.id;
-                  let d=0,p=0,m=0;
-                  dates.forEach(dt=>{const v=(gp.lessons[dt].records||{})[pid]; if(v==="done")d++;else if(v==="partial")p++;else if(v==="missed")m++;});
-                  const rp=pct(d,p,m);
+                  let fs=0,c=0;
+                  dates.forEach(dt=>{const rs=recStat((gp.lessons[dt].records||{})[pid]); if(rs){fs+=rs.fraction;c++;}});
+                  const rp=fracPct(fs,c);
                   const bg=ri%2?"#FAFAFB":"#fff";
                   return(
                     <tr key={pid} style={{borderTop:`1px solid ${G2}`,background:bg}}>
                       <td onClick={()=>onOpenStudent(pid)} style={{padding:"9px 12px",fontSize:13,fontWeight:600,whiteSpace:"nowrap",position:"sticky",left:0,background:bg,cursor:"pointer",color:TXT}}>{st.name||"Unnamed"}</td>
-                      {dates.map(dt=>{const s=stColor((gp.lessons[dt].records||{})[pid]);return(
+                      {dates.map(dt=>{const f=cellFace((gp.lessons[dt].records||{})[pid]);return(
                         <td key={dt} style={{padding:"5px 6px",textAlign:"center"}}>
-                          <button onClick={()=>toggle(pid,dt)} style={{width:28,height:28,borderRadius:8,fontSize:14,fontWeight:800,cursor:"pointer",...cellStyle[s]}}>{glyph[s]}</button>
+                          <button onClick={()=>setMarkCell({pid,name:st.name||"Student",date:dt})} style={{width:32,height:28,borderRadius:8,fontSize:14,fontWeight:800,cursor:"pointer",...f.style}}>{f.txt}</button>
                         </td>);})}
-                      <td style={{padding:"5px 8px",textAlign:"center",fontWeight:800,fontSize:12,color:rp>=80?GOOD:rp>=60?"#B8770B":BAD}}>{dates.length?rp:"—"}</td>
+                      <td style={{padding:"5px 8px",textAlign:"center",fontWeight:800,fontSize:12,color:rp>=80?GOOD:rp>=60?"#B8770B":BAD}}>{c?rp:"—"}</td>
                     </tr>
                   );
                 })}
@@ -1126,10 +1333,10 @@ function HomeworkGrid({group,gp,monthIdx,year,onBack,onChange,onOpenReport,onOpe
             </table>
           </div>)}
           <div style={{display:"flex",gap:12,marginTop:12,fontSize:11.5,color:G1,alignItems:"center",flexWrap:"wrap"}}>
-            <span><span style={{display:"inline-flex",width:18,height:18,borderRadius:5,background:Y,color:"#000",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,verticalAlign:"middle"}}>✓</span> Done</span>
-            <span><span style={{display:"inline-flex",width:18,height:18,borderRadius:5,background:"#FDECEC",color:BAD,alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,verticalAlign:"middle"}}>✗</span> Missed</span>
-            <span><span style={{display:"inline-flex",width:18,height:18,borderRadius:5,background:"#FFF3DC",color:"#B8770B",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,verticalAlign:"middle"}}>◐</span> Partial</span>
-            <span style={{marginLeft:"auto",color:"#B8770B",fontWeight:700}}>* custom homework</span>
+            <span><span style={{display:"inline-flex",width:18,height:18,borderRadius:5,background:Y,color:"#000",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,verticalAlign:"middle"}}>✓</span> all done</span>
+            <span><span style={{display:"inline-flex",width:26,height:18,borderRadius:5,background:"#FFF3DC",color:"#B8770B",border:"1px solid #F3D9A6",alignItems:"center",justifyContent:"center",fontSize:9.5,fontWeight:800,verticalAlign:"middle"}}>3/5</span> partly</span>
+            <span><span style={{display:"inline-flex",width:18,height:18,borderRadius:5,background:"#FDECEC",color:BAD,alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,verticalAlign:"middle"}}>✗</span> none</span>
+            <span style={{marginLeft:"auto",color:"#8a7400",fontWeight:700}}>tap a cell to tick types</span>
           </div>
         </div>
       )}
@@ -1138,16 +1345,20 @@ function HomeworkGrid({group,gp,monthIdx,year,onBack,onChange,onOpenReport,onOpe
         <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
           {dates.length===0&&<div style={{color:G1,textAlign:"center",padding:"30px 0"}}>No lessons yet. Tap <b>+ Lesson</b> below.</div>}
           {dates.map(d=>{
-            const ls=gp.lessons[d]; const custom=!!ls.homework;
+            const ls=gp.lessons[d]; const custom=isCustom(d);
+            const tps=lessonTypes(gp,d);
             return(
               <div key={d} style={{background:BG2,border:`1.5px solid ${custom?YD:G2}`,borderRadius:14,padding:"13px 15px",boxShadow:SH1}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div style={{fontWeight:800,fontSize:15,color:TXT}}>{shortDate(d)} {custom&&<span style={{color:"#B8770B",fontSize:12}}>· custom *</span>}</div>
                   <IconBtn onClick={()=>setDelDate(d)} label="Remove lesson" danger>✕</IconBtn>
                 </div>
-                <div style={{fontSize:13.5,color:custom?TXT:G1,marginTop:6,lineHeight:1.4}}>{ls.homework||gp.defaultHomework||"— no homework set —"}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:8}}>
+                  {tps.map(t=><span key={t} style={{display:"inline-flex",alignItems:"center",gap:4,background:custom?"#FFF3DC":BG3,color:custom?"#B8770B":TXT,border:`1px solid ${custom?"#F3D9A6":G2}`,borderRadius:8,padding:"4px 9px",fontSize:11.5,fontWeight:700}}>{typeIcon(t)} {t}</span>)}
+                </div>
+                {(ls.homework||gp.defaultHomework)&&<div style={{fontSize:12.5,color:ls.homework?TXT:G1,marginTop:8,lineHeight:1.4}}>📝 {ls.homework||gp.defaultHomework}</div>}
                 <div style={{display:"flex",gap:8,marginTop:10}}>
-                  <OutBtn onClick={()=>{setHwEdit(d);setHwVal(ls.homework||"");}} style={{flex:1,textAlign:"center",padding:"8px 10px",minHeight:38,fontSize:13}}>{custom?"Edit homework":"Customise homework"}</OutBtn>
+                  <OutBtn onClick={()=>setHwEdit(d)} style={{flex:1,textAlign:"center",padding:"8px 10px",minHeight:38,fontSize:13}}>{custom?"Edit this date":"Customise this date"}</OutBtn>
                 </div>
               </div>
             );
@@ -1158,26 +1369,27 @@ function HomeworkGrid({group,gp,monthIdx,year,onBack,onChange,onOpenReport,onOpe
       <FAB onClick={()=>setAddOpen(true)} label="Add lesson">+ Lesson</FAB>
 
       {editDefault&&(
-        <Overlay onClose={()=>setEditDefault(false)}>
-          <div style={{fontWeight:800,fontSize:19,color:TXT,marginBottom:4}}>Month default homework</div>
-          <div style={{color:G1,fontSize:13,marginBottom:16}}>Shown for every lesson unless a date is customised.</div>
-          <textarea value={defVal} onChange={e=>setDefVal(e.target.value)} rows={3} placeholder="e.g. Workbook p.40–41 + 10 new words" style={{width:"100%",background:BG3,border:`1.5px solid ${G2}`,borderRadius:R_BTN,color:TXT,padding:"13px 14px",fontSize:16,outline:"none",resize:"vertical",marginBottom:20}}/>
-          <div style={{display:"flex",gap:10}}>
-            <OutBtn onClick={()=>setEditDefault(false)} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
-            <YBtn onClick={()=>{onChange({...gp,defaultHomework:defVal.trim()});setEditDefault(false);}} style={{flex:2,textAlign:"center"}}>Save</YBtn>
-          </div>
-        </Overlay>
+        <TypesEditor title="Homework types · this month" subtitle="These types apply to every lesson unless a date is customised."
+          initialTypes={monthTypes} initialNote={gp.defaultHomework||""}
+          onSave={(types,note)=>{onChange({...gp,types,defaultHomework:note});setEditDefault(false);}}
+          onClose={()=>setEditDefault(false)}/>
       )}
       {hwEdit&&(
-        <Overlay onClose={()=>setHwEdit(null)}>
-          <div style={{fontWeight:800,fontSize:19,color:TXT,marginBottom:4}}>Homework · {shortDate(hwEdit)}</div>
-          <div style={{color:G1,fontSize:13,marginBottom:16}}>Leave empty to use the month default.</div>
-          <textarea value={hwVal} onChange={e=>setHwVal(e.target.value)} rows={3} placeholder={gp.defaultHomework||"Homework for this lesson"} style={{width:"100%",background:BG3,border:`1.5px solid ${G2}`,borderRadius:R_BTN,color:TXT,padding:"13px 14px",fontSize:16,outline:"none",resize:"vertical",marginBottom:20}}/>
-          <div style={{display:"flex",gap:10}}>
-            <OutBtn onClick={()=>setHwEdit(null)} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
-            <YBtn onClick={saveHw} style={{flex:2,textAlign:"center"}}>Save</YBtn>
-          </div>
-        </Overlay>
+        <TypesEditor title={`Homework · ${shortDate(hwEdit)}`} subtitle="Custom types and note for this date only."
+          initialTypes={lessonTypes(gp,hwEdit)} initialNote={(gp.lessons[hwEdit]||{}).homework||""}
+          resetLabel="↺ Reset to month default"
+          onReset={()=>{ const ls={...(gp.lessons[hwEdit]||{records:{}})}; delete ls.types; delete ls.homework; onChange({...gp,lessons:{...gp.lessons,[hwEdit]:ls}}); setHwEdit(null); }}
+          onSave={(types,note)=>{
+            const ls={...(gp.lessons[hwEdit]||{records:{}})};
+            ls.types=types; if(note)ls.homework=note; else delete ls.homework;
+            onChange({...gp,lessons:{...gp.lessons,[hwEdit]:ls}}); setHwEdit(null);
+          }}
+          onClose={()=>setHwEdit(null)}/>
+      )}
+      {markCell&&(
+        <MarkSheet studentName={markCell.name} date={markCell.date} types={lessonTypes(gp,markCell.date)}
+          initialRec={(gp.lessons[markCell.date].records||{})[markCell.pid]}
+          onSave={saveMark} onClear={clearMark} onClose={()=>setMarkCell(null)}/>
       )}
       {addOpen&&(
         <Overlay onClose={()=>setAddOpen(false)}>
@@ -1199,12 +1411,14 @@ function HomeworkGrid({group,gp,monthIdx,year,onBack,onChange,onOpenReport,onOpe
 function GroupReport({groupName,monthIdx,year,groups,perf,onBack,onExport}){
   const[range,setRange]=useState("month");
   const win=rangeWindow(range,refDateFor(monthIdx,year));
-  const {lessons,perStudent,totals}=useMemo(()=>groupReport(groups,perf,groupName,win),[groups,perf,groupName,range,monthIdx,year]);
-  const rate=pct(totals.done,totals.partial,totals.missed);
-  const line=lessons.map(l=>pct(l.done,l.partial,l.missed));
+  const {lessons,perStudent,totals,types}=useMemo(()=>groupReport(groups,perf,groupName,win),[groups,perf,groupName,range,monthIdx,year]);
+  const rate=totals.rate;
+  const line=lessons.map(l=>l.rate);
   const lbls=lessons.map(l=>shortDate(l.date));
-  const bars=perStudent.map(s=>({label:s.name,value:pct(s.done,s.partial,s.missed)})).sort((a,b)=>b.value-a.value);
+  const bars=perStudent.map(s=>({label:s.name,value:s.rate})).sort((a,b)=>b.value-a.value);
   const rows=perStudent.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const typeBars=Object.entries(types).filter(([,v])=>v.total>0).map(([t,v])=>({label:t,value:Math.round(v.done/v.total*100)})).sort((a,b)=>b.value-a.value);
+  const weakest=typeBars.length>=2?typeBars[typeBars.length-1]:null;
 
   return(
     <div style={{paddingBottom:40}}>
@@ -1224,6 +1438,17 @@ function GroupReport({groupName,monthIdx,year,groups,perf,onBack,onExport}){
         ))}
       </div>
 
+      {typeBars.length>0&&(
+        <div style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:16,padding:14,marginBottom:14,boxShadow:SH1}}>
+          <Lbl>By homework type · bar</Lbl>
+          <BarRows rows={typeBars.map(b=>({label:`${typeIcon(b.label)} ${b.label}`,value:b.value}))}/>
+          {weakest&&weakest.value<70&&(
+            <div style={{marginTop:12,background:"#FDECEC",border:"1px solid #F6C9CA",borderRadius:10,padding:"9px 12px",fontSize:12,color:BAD,fontWeight:700}}>
+              ⚠ Weakest skill: {weakest.label} ({weakest.value}%) — worth pushing
+            </div>
+          )}
+        </div>
+      )}
       <div style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:16,padding:"14px 14px 10px",marginBottom:14,boxShadow:SH1}}>
         <Lbl>Completion trend · line</Lbl>
         <LineChart primary={line} labels={lbls.length<=8?lbls:[]}/>
@@ -1250,7 +1475,7 @@ function GroupReport({groupName,monthIdx,year,groups,perf,onBack,onExport}){
             <thead><tr style={{background:BG3}}>{["Student","Done","Part.","Miss","Rate"].map((h,i)=><th key={h} style={{padding:"9px 12px",fontSize:11,color:G1,textAlign:i?"center":"left"}}>{h}</th>)}</tr></thead>
             <tbody>
               {rows.length===0&&<tr><td colSpan={5} style={{padding:"20px",textAlign:"center",color:G1}}>No homework marked in this range.</td></tr>}
-              {rows.map((s,i)=>{const rp=pct(s.done,s.partial,s.missed);return(
+              {rows.map((s,i)=>{const rp=s.rate;return(
                 <tr key={s.pid} style={{borderTop:`1px solid ${G2}`,background:i%2?"#FAFAFB":"#fff"}}>
                   <td style={{padding:"9px 12px",fontWeight:600}}>{s.name}</td>
                   <td style={{padding:"9px 12px",textAlign:"center"}}>{s.done}</td>
@@ -1269,7 +1494,7 @@ function GroupReport({groupName,monthIdx,year,groups,perf,onBack,onExport}){
 // ══════════════ PORTFOLIO ══════════════
 
 // Rate for one person over a window (used in lists/cards)
-function personRate(groups,perf,pid,win){ const {totals}=studentReport(groups,perf,pid,win); return {rate:pct(totals.done,totals.partial,totals.missed),...totals}; }
+function personRate(groups,perf,pid,win){ const {totals}=studentReport(groups,perf,pid,win); return {rate:totals.rate,...totals}; }
 
 function PortfolioEditModal({name,data,onSave,onClose}){
   const[d,setD]=useState({gradeYear:"",studyPlace:"",livingPlace:"",studentPhone:"",parentPhone:"",notes:"",...data});
@@ -1289,123 +1514,21 @@ function PortfolioEditModal({name,data,onSave,onClose}){
   );
 }
 
-// Portfolio list — every unique student (deduped by pid)
-function PortfolioList({groups,perf,portfolios,onBack,onOpenStudent}){
-  const[q,setQ]=useState("");
-  const people=useMemo(()=>Object.values(rosterByPid(groups)).sort((a,b)=>a.name.localeCompare(b.name)),[groups]);
-  const rates=useMemo(()=>{ const m={}; people.forEach(p=>{ m[p.pid]=personRate(groups,perf,p.pid,rangeWindow("6mo",refDateFor(p.month,p.year))).rate; }); return m; },[people,perf,groups]);
-  const shown=people.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.groupName||"").toLowerCase().includes(q.toLowerCase()));
-  return(
-    <div style={{paddingBottom:40}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-        <BackBtn onClick={onBack}/>
-        <div style={{flex:1,minWidth:0}}>
-          <h2 style={{margin:0,color:TXT,fontSize:21,fontWeight:800}}>Student Portfolio</h2>
-          <div style={{color:G1,fontSize:13}}>{people.length} student{people.length!==1?"s":""}</div>
-        </div>
-      </div>
-      <Inp placeholder="🔍 Search name or group" value={q} onChange={e=>setQ(e.target.value)} style={{marginBottom:16}}/>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {shown.length===0&&<div style={{color:G1,textAlign:"center",padding:"44px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2}}>No students found.</div>}
-        {shown.map(p=>{
-          const r=rates[p.pid]||0; const has=(portfolios[p.pid]&&Object.values(portfolios[p.pid]).some(v=>v&&String(v).trim()));
-          return(
-            <div key={p.pid} onClick={()=>onOpenStudent(p.pid)} className="tap" style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:SH1,cursor:"pointer"}}>
-              <div style={{width:42,height:42,borderRadius:"50%",background:BG3,border:`2px solid ${G2}`,display:"flex",alignItems:"center",justifyContent:"center",color:TXT,fontWeight:800,fontSize:17,flexShrink:0}}>{(p.name||"?").charAt(0).toUpperCase()}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{color:TXT,fontWeight:700,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name||"Unnamed"}</div>
-                <div style={{color:G1,fontSize:12.5,marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.groupName} {has?"":"· no info yet"}</div>
-              </div>
-              <div style={{textAlign:"right",flexShrink:0}}>
-                <div style={{fontWeight:800,fontSize:15,color:r>=80?GOOD:r>=60?"#B8770B":r>0?BAD:G1}}>{r}%</div>
-                <div style={{color:G1,fontSize:10,fontWeight:700}}>HW</div>
-              </div>
-              <div style={{color:G1,fontSize:20,flexShrink:0}}>›</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Portfolio detail — identity + info + recent homework
-function PortfolioDetail({pid,groups,perf,portfolios,onBack,onSave,onOpenReport,onExport}){
-  const[edit,setEdit]=useState(false);
-  const person=rosterByPid(groups)[pid];
-  const info=portfolios[pid]||{};
-  const win=rangeWindow("6mo",refDateFor(person?person.month:NOW_MONTH,person?person.year:NOW_YEAR));
-  const {lessons,totals}=studentReport(groups,perf,pid,win);
-  const rate=pct(totals.done,totals.partial,totals.missed);
-  const recent=lessons.slice(-6);
-  if(!person)return(<div style={{padding:40,textAlign:"center",color:G1}}>Student not found.<OutBtn onClick={onBack} style={{marginTop:16}}>Back</OutBtn></div>);
-  const tag={done:{background:Y,color:"#000",t:"✓"},partial:{background:"#FFF3DC",color:"#B8770B",t:"◐"},missed:{background:"#FDECEC",color:BAD,t:"✗"}};
-  const F=[["gradeYear","Course year"],["studyPlace","Place of study"],["livingPlace","Lives in"],["studentPhone","Student phone"],["parentPhone","Parent phone"]];
-  return(
-    <div style={{paddingBottom:90}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-        <BackBtn onClick={onBack}/>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{color:G1,fontSize:12,fontWeight:600}}>Student Portfolio</div>
-          <div style={{color:TXT,fontWeight:800,fontSize:20,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{person.name}</div>
-        </div>
-        <button onClick={()=>onExport(pid)} aria-label="Export PDF" style={{background:"#111",border:"none",borderRadius:12,color:"#fff",height:44,padding:"0 14px",cursor:"pointer",fontSize:14,fontWeight:700}}>📄</button>
-      </div>
-
-      <div style={{background:"#111",borderRadius:18,padding:"18px 20px",marginBottom:16,boxShadow:SH2}}>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:56,height:56,borderRadius:"50%",background:Y,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:800,color:"#000",flexShrink:0}}>{(person.name||"?").charAt(0).toUpperCase()}</div>
-          <div style={{minWidth:0}}>
-            <div style={{color:"#fff",fontWeight:800,fontSize:19,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{person.name}</div>
-            <div style={{color:"#ffffff99",fontSize:12.5,marginTop:3}}>{person.groupName} · {MONTHS[person.month]} {person.year}</div>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:10,marginTop:16}}>
-          <div style={{flex:1,background:"rgba(255,255,255,.08)",borderRadius:12,padding:"10px 12px"}}><div style={{color:"#ffffff77",fontSize:10,fontWeight:700}}>HW RATE</div><div style={{color:Y,fontWeight:800,fontSize:17}}>{rate}%</div></div>
-          <div style={{flex:1,background:"rgba(255,255,255,.08)",borderRadius:12,padding:"10px 12px"}}><div style={{color:"#ffffff77",fontSize:10,fontWeight:700}}>PAYMENT</div><div style={{color:"#fff",fontWeight:800,fontSize:17}}>{person.paidFull?"Paid ✓":"Due"}</div></div>
-        </div>
-      </div>
-
-      <Lbl>Personal information</Lbl>
-      <div style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:16,padding:"4px 16px",marginBottom:16,boxShadow:SH1}}>
-        {F.map(([k,l],i)=>(
-          <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"12px 0",borderBottom:i<F.length-1||info.notes?`1px solid ${G2}`:"none"}}>
-            <span style={{color:G1,fontSize:13.5}}>{l}</span>
-            <span style={{fontWeight:700,fontSize:13.5,textAlign:"right",color:info[k]?TXT:G2}}>{info[k]||"—"}</span>
-          </div>
-        ))}
-        {info.notes&&<div style={{padding:"12px 0"}}><div style={{color:G1,fontSize:13.5,marginBottom:4}}>Notes</div><div style={{fontWeight:600,fontSize:13.5,lineHeight:1.5}}>{info.notes}</div></div>}
-      </div>
-
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <Lbl>Recent homework</Lbl>
-        <button onClick={()=>onOpenReport(pid)} style={{background:"none",border:"none",color:YD,fontWeight:800,fontSize:12.5,cursor:"pointer"}}>Full report ›</button>
-      </div>
-      <div style={{display:"flex",gap:7,marginBottom:8,flexWrap:"wrap"}}>
-        {recent.length===0&&<span style={{color:G1,fontSize:13}}>No homework recorded yet.</span>}
-        {recent.map((l,i)=>{const t=tag[l.status]||{background:BG3,color:G2,t:"·"};return(<span key={i} title={shortDate(l.date)} style={{width:30,height:30,borderRadius:9,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:800,...t,color:t.color}}>{t.t}</span>);})}
-      </div>
-
-      <FAB onClick={()=>setEdit(true)} label="Edit info"><span style={{color:Y}}>✎ Edit info</span></FAB>
-      {edit&&<PortfolioEditModal name={person.name} data={info} onClose={()=>setEdit(false)} onSave={d=>{onSave(pid,d);setEdit(false);}}/>}
-    </div>
-  );
-}
-
 // Single-student report — charts vs group + lesson table
 function StudentReport({pid,groups,perf,onBack,onExport}){
   const[range,setRange]=useState("month");
   const person=rosterByPid(groups)[pid];
   const ref=refDateFor(person?person.month:NOW_MONTH,person?person.year:NOW_YEAR);
   const win=rangeWindow(range,ref);
-  const {lessons,totals}=useMemo(()=>studentReport(groups,perf,pid,win),[groups,perf,pid,range]);
+  const {lessons,totals,types}=useMemo(()=>studentReport(groups,perf,pid,win),[groups,perf,pid,range]);
   const grp=useMemo(()=>person?groupReport(groups,perf,person.groupName,win):{lessons:[]},[groups,perf,pid,range]);
-  const rate=pct(totals.done,totals.partial,totals.missed);
-  const dateAvg={}; grp.lessons.forEach(l=>{dateAvg[l.date]=pct(l.done,l.partial,l.missed);});
-  const primary=lessons.map(l=>l.status==="done"?100:l.status==="partial"?50:0);
-  const compare=lessons.map(l=>dateAvg[l.date]!=null?dateAvg[l.date]:0);
-  const lbls=lessons.map(l=>shortDate(l.date));
-  const tag={done:{bg:"#E3F5EA",c:GOOD,t:"Done"},partial:{bg:"#FFF3DC",c:"#B8770B",t:"Partial"},missed:{bg:"#FDECEC",c:BAD,t:"Missed"}};
+  const rate=totals.rate;
+  const dateAvg={}; grp.lessons.forEach(l=>{dateAvg[l.date]=l.rate;});
+  const marked=lessons.filter(l=>l.stat);
+  const primary=marked.map(l=>Math.round(l.stat.fraction*100));
+  const compare=marked.map(l=>dateAvg[l.date]!=null?dateAvg[l.date]:0);
+  const lbls=marked.map(l=>shortDate(l.date));
+  const typeBars=Object.entries(types).filter(([,v])=>v.total>0).map(([t,v])=>({label:t,value:Math.round(v.done/v.total*100)})).sort((a,b)=>b.value-a.value);
   if(!person)return(<div style={{padding:40,textAlign:"center",color:G1}}>Student not found.<OutBtn onClick={onBack} style={{marginTop:16}}>Back</OutBtn></div>);
   return(
     <div style={{paddingBottom:40}}>
@@ -1430,6 +1553,13 @@ function StudentReport({pid,groups,perf,onBack,onExport}){
         </div>
       </div>
 
+      {typeBars.length>0&&(
+        <div style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:16,padding:14,marginBottom:14,boxShadow:SH1}}>
+          <Lbl>By homework type · bar</Lbl>
+          <BarRows rows={typeBars.map(b=>({label:`${typeIcon(b.label)} ${b.label}`,value:b.value}))}/>
+        </div>
+      )}
+
       <div style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:16,padding:"14px 14px 10px",marginBottom:14,boxShadow:SH1}}>
         <Lbl>Trend vs group average · line</Lbl>
         <LineChart primary={primary} compare={compare} labels={lbls.length<=8?lbls:[]} height={120}/>
@@ -1444,12 +1574,27 @@ function StudentReport({pid,groups,perf,onBack,onExport}){
         <table style={{borderCollapse:"collapse",width:"100%",fontSize:13}}>
           <tbody>
             {lessons.length===0&&<tr><td style={{padding:"20px",textAlign:"center",color:G1}}>No homework in this range.</td></tr>}
-            {lessons.slice().reverse().map((l,i)=>{const t=tag[l.status]||{bg:BG3,c:G1,t:"—"};return(
-              <tr key={i} style={{borderTop:i?`1px solid ${G2}`:"none"}}>
-                <td style={{padding:"11px 14px",whiteSpace:"nowrap"}}>{shortDate(l.date)}</td>
-                <td style={{padding:"11px 14px",color:G1,overflow:"hidden",textOverflow:"ellipsis",maxWidth:0}}>{l.homework||"—"}</td>
-                <td style={{padding:"11px 14px",textAlign:"right"}}><span style={{background:t.bg,color:t.c,fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{t.t}</span></td>
-              </tr>);})}
+            {lessons.slice().reverse().map((l,i)=>{
+              const rs=l.stat;
+              const pill=!rs?{bg:BG3,c:G1,t:"—"}
+                :rs.fraction===1?{bg:"#E3F5EA",c:GOOD,t:"Done"}
+                :rs.fraction===0?{bg:"#FDECEC",c:BAD,t:"Missed"}
+                :{bg:"#FFF3DC",c:"#B8770B",t:rs.legacy?"Partial":`${rs.done}/${rs.total}`};
+              const miss=missedTypes(l.rec);
+              return(
+                <tr key={i} style={{borderTop:i?`1px solid ${G2}`:"none"}}>
+                  <td style={{padding:"11px 14px",whiteSpace:"nowrap",verticalAlign:"top"}}>{shortDate(l.date)}</td>
+                  <td style={{padding:"11px 14px",color:G1,maxWidth:0}}>
+                    <div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.homework||(l.types||[]).join(", ")||"—"}</div>
+                    {miss.length>0&&rs&&rs.fraction>0&&rs.fraction<1&&(
+                      <div style={{marginTop:4,display:"flex",flexWrap:"wrap",gap:4}}>
+                        {miss.map(t=><span key={t} style={{background:"#FDECEC",color:BAD,border:"1px solid #F6C9CA",borderRadius:6,padding:"2px 7px",fontSize:10,fontWeight:800}}>✗ {t}</span>)}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{padding:"11px 14px",textAlign:"right",verticalAlign:"top"}}><span style={{background:pill.bg,color:pill.c,fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{pill.t}</span></td>
+                </tr>
+              );})}
           </tbody>
         </table>
       </div>
@@ -1475,7 +1620,7 @@ function App(){
   const[perfYear,setPerfYear]=useState(NOW_YEAR);
   const[reportGroup,setReportGroup]=useState(null);
   const[selPid,setSelPid]=useState(null);
-  const[studentBack,setStudentBack]=useState("portfolio");
+  const[studentBack,setStudentBack]=useState("performance");
   const[pdfReq,setPdfReq]=useState(null);
   const[addingMonth,setAddingMonth]=useState(false);
   const[newMonthIdx,setNewMonthIdx]=useState(NOW_MONTH);
@@ -1559,11 +1704,12 @@ function App(){
   const ensurePerf=useCallback((g)=>{
     setPerformance(p=>{
       const ex=p[g.id];
-      if(ex&&ex.lessons&&Object.keys(ex.lessons).length)return p;
+      if(ex&&ex.lessons&&Object.keys(ex.lessons).length&&ex.types&&ex.types.length)return p;
       const schedule=(ex&&ex.schedule)||scheduleFromName(g.name);
+      const types=(ex&&ex.types&&ex.types.length)?ex.types:DEFAULT_TYPES.slice();
       const lessons=(ex&&ex.lessons)?{...ex.lessons}:{};
       if(!Object.keys(lessons).length)parityDatesForMonth(g.year,g.month,schedule).forEach(d=>lessons[d]={records:{}});
-      return {...p,[g.id]:{schedule,defaultHomework:(ex&&ex.defaultHomework)||"",lessons}};
+      return {...p,[g.id]:{...(ex||{}),schedule,types,defaultHomework:(ex&&ex.defaultHomework)||"",lessons}};
     });
   },[]);
   const savePortfolio=useCallback((pid,data)=>setPortfolios(p=>({...p,[pid]:data})),[]);
@@ -1682,7 +1828,10 @@ function App(){
       <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
         <div style={{maxWidth:760,margin:"0 auto"}}>
           <GroupView group={grp} monthLabel={`${MONTHS[grp.month]} ${grp.year}`}
-            onBack={()=>setView("month")} onUpdate={g=>{updGroup(g);}}/>
+            onBack={()=>setView("month")} onUpdate={g=>{updGroup(g);}}
+            portfolios={portfolios} onSavePortfolio={savePortfolio}
+            hwRateFor={(pid)=>personRate(groups,performance,pid,rangeWindow("6mo",refDateFor(grp.month,grp.year)))}
+            onOpenStudentReport={(pid)=>openStudentReport(pid,"group")}/>
         </div>
         {saved&&<div style={{position:"fixed",bottom:"calc(26px + var(--safe-bottom))",left:"max(18px,var(--safe-left))",background:"#111",color:Y,borderRadius:20,padding:"7px 15px",fontSize:13,fontWeight:700,boxShadow:SH2,zIndex:901}}>✓ Saved</div>}
       </div>
@@ -1735,16 +1884,6 @@ function App(){
     return shell(<GroupReport groupName={reportGroup.name} monthIdx={reportGroup.month} year={reportGroup.year}
       groups={groups} perf={performance} onBack={()=>setView(reportGroup.back||"performance")}
       onExport={(range)=>setPdfReq({kind:"group",groupName:reportGroup.name,month:reportGroup.month,year:reportGroup.year,range})}/>);
-  }
-  if(view==="portfolio"){
-    return shell(<PortfolioList groups={groups} perf={performance} portfolios={portfolios}
-      onBack={()=>setView("home")} onOpenStudent={(pid)=>{setSelPid(pid);setView("portfolio-student");}}/>);
-  }
-  if(view==="portfolio-student"&&selPid){
-    return shell(<PortfolioDetail pid={selPid} groups={groups} perf={performance} portfolios={portfolios}
-      onBack={()=>setView("portfolio")} onSave={savePortfolio}
-      onOpenReport={(pid)=>openStudentReport(pid,"portfolio-student")}
-      onExport={(pid)=>setPdfReq({kind:"student",pid,range:"month"})}/>);
   }
   if(view==="student-report"&&selPid){
     return shell(<StudentReport pid={selPid} groups={groups} perf={performance}
@@ -1862,9 +2001,8 @@ function App(){
   const peopleCount=Object.keys(rosterByPid(groups)).length;
   const enterPerformance=()=>{ if(perfMonth==null){setPerfMonth(latest.month);setPerfYear(latest.year);} setView("performance"); };
   const sections=[
-    {ico:"💳",bg:YSOFT,title:"Payments",sub:`Monthly fees · ${activeMonths.length} month${activeMonths.length!==1?"s":""} · ${peopleCount} students`,go:()=>setView("payments")},
-    {ico:"📈",bg:"#E3F5EA",title:"Performance",sub:"Daily homework tracking · reports & charts",go:enterPerformance},
-    {ico:"🗂️",bg:"#E7ECFF",title:"Student Portfolio",sub:`Contacts, study & living info · ${peopleCount} students`,go:()=>setView("portfolio")},
+    {ico:"💳",bg:YSOFT,title:"Payments",sub:`Fees & who paid · student info inside 🗂️ · ${peopleCount} students`,go:()=>setView("payments")},
+    {ico:"📈",bg:"#E3F5EA",title:"Performance",sub:"Typed homework tracking · reports & charts",go:enterPerformance},
   ];
   return(
     <div style={{minHeight:"100vh",background:BG,padding:"calc(20px + var(--safe-top)) 16px 40px"}}>
@@ -1912,7 +2050,7 @@ function App(){
 
         <div style={{background:YSOFT,border:`1px solid ${YD}`,borderRadius:14,padding:"13px 15px",marginTop:16,display:"flex",gap:10,alignItems:"flex-start"}}>
           <span style={{fontSize:17}}>🔗</span>
-          <div style={{fontSize:12.5,color:"#5a4a00",lineHeight:1.5}}>All three sections share the <b>same students</b>. Add or delete a student once — it updates everywhere.</div>
+          <div style={{fontSize:12.5,color:"#5a4a00",lineHeight:1.5}}>Student info lives inside <b>Payments → group → student</b>. Both sections share the same students — add or delete once, it updates everywhere.</div>
         </div>
       </div>
 
