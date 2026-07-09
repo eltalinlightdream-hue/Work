@@ -69,7 +69,10 @@ const uid=()=>Math.random().toString(36).slice(2,9);
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const NOW_MONTH=new Date().getMonth();
 const NOW_YEAR=new Date().getFullYear();
-const TEACHER_PCT=55;
+const PCT_KEY="myClassesTeacherPct";
+// Teacher's monthly share of collected payments — editable in Settings, saved on device
+let TEACHER_PCT=(()=>{ try{const v=parseInt(localStorage.getItem(PCT_KEY),10); return (v>=0&&v<=100)?v:55; }catch(e){ return 55; } })();
+const setTeacherPctGlobal=(v)=>{ TEACHER_PCT=Math.max(0,Math.min(100,Math.round(v||0))); try{localStorage.setItem(PCT_KEY,String(TEACHER_PCT));}catch(e){} return TEACHER_PCT; };
 
 // Colors — white/yellow/black theme
 const Y="#FFD600", YD="#E6C000", YSOFT="#FFF7CC";
@@ -1628,6 +1631,8 @@ function App(){
   const[saved,setSaved]=useState(false);
   const[restoreMsg,setRestoreMsg]=useState("");
   const[menuOpen,setMenuOpen]=useState(false);
+  const[teacherPct,setTeacherPct]=useState(TEACHER_PCT);
+  const changePct=(v)=>setTeacherPct(setTeacherPctGlobal(v));
 
   // Auto-save
   useEffect(()=>{
@@ -2021,7 +2026,7 @@ function App(){
           <div style={{position:"relative"}}>
             <div style={{color:"#ffffff99",fontSize:11,fontWeight:800,letterSpacing:"0.1em",marginBottom:8}}>YOUR INCOME · {MONTHS[latest.month].toUpperCase()} {latest.year}</div>
             <div style={{color:Y,fontSize:33,fontWeight:900,letterSpacing:"-1px",marginBottom:4}}>{fmt(heroIncome)}</div>
-            <div style={{color:"#ffffff88",fontSize:12,marginBottom:18}}>{TEACHER_PCT}% of collected payments</div>
+            <div onClick={()=>setMenuOpen(true)} style={{color:"#ffffff88",fontSize:12,marginBottom:18,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:5}}>{TEACHER_PCT}% of collected payments <span style={{color:Y,fontWeight:700}}>· edit ✎</span></div>
             <div style={{display:"flex",gap:24,flexWrap:"wrap"}}>
               {[["BILLED",fmt(hero.due)],["COLLECTED",fmt(hero.paid)],[`CENTER (${100-TEACHER_PCT}%)`,fmt(hero.paid*((100-TEACHER_PCT)/100))]].map(([l,v])=>(
                 <div key={l}><div style={{color:"#ffffff77",fontSize:10,fontWeight:700,letterSpacing:"0.05em"}}>{l}</div><div style={{color:"#fff",fontWeight:800,fontSize:15,marginTop:3}}>{v}</div></div>
@@ -2058,7 +2063,32 @@ function App(){
 
       {menuOpen&&(
         <Overlay onClose={()=>setMenuOpen(false)}>
-          <div style={{fontWeight:800,fontSize:19,color:TXT,marginBottom:18}}>Data &amp; Backup</div>
+          <div style={{fontWeight:800,fontSize:19,color:TXT,marginBottom:18}}>Settings &amp; Backup</div>
+
+          {/* Teacher's monthly share */}
+          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div>
+                <div style={{color:TXT,fontWeight:800,fontSize:15}}>💰 Teacher's monthly share</div>
+                <div style={{color:G1,fontSize:12,marginTop:2}}>Your cut of every payment collected</div>
+              </div>
+              <div style={{display:"flex",alignItems:"baseline",gap:2}}>
+                <span style={{color:TXT,fontWeight:900,fontSize:26,letterSpacing:"-1px"}}>{teacherPct}</span>
+                <span style={{color:G1,fontWeight:800,fontSize:15}}>%</span>
+              </div>
+            </div>
+            <input type="range" min="0" max="100" step="1" value={teacherPct} onChange={e=>changePct(Number(e.target.value))}
+              style={{width:"100%",accentColor:YD,height:26,cursor:"pointer"}}/>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginTop:6}}>
+              <div style={{position:"relative",width:110}}>
+                <Inp type="number" inputMode="numeric" min="0" max="100" value={teacherPct}
+                  onChange={e=>changePct(Number(e.target.value))} style={{paddingRight:30,background:BG2,textAlign:"center",fontWeight:800}}/>
+                <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:G1,fontSize:14,pointerEvents:"none"}}>%</span>
+              </div>
+              <div style={{flex:1,textAlign:"right",fontSize:12.5,color:G1}}>You keep <b style={{color:TXT}}>{teacherPct}%</b> · center gets <b style={{color:TXT}}>{100-teacherPct}%</b></div>
+            </div>
+          </div>
+
           <button onClick={doBackup} style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:BG3,border:`1px solid ${G2}`,borderRadius:14,color:TXT,padding:"15px 16px",cursor:"pointer",fontSize:15,fontWeight:700,marginBottom:10}}>
             <span style={{fontSize:20}}>⬇</span> Back up to file
           </button>
