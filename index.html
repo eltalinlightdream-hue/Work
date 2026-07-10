@@ -648,10 +648,8 @@ function LangPicker({title,onPick,onClose}){
 }
 
 // ── Student Modal — payments (unchanged) + student information ──
-function StudentModal({student,onSave,onClose,info={},onSaveInfo,hw,onOpenReport}){
+function StudentModal({student,onSave,onClose}){
   const[d,setD]=useState({...student,payments:student.payments.map(p=>({...p}))});
-  const[editInfo,setEditInfo]=useState(false);
-  const INFO_FIELDS=[["gradeYear","Course year"],["studyPlace","Place of study"],["livingPlace","Lives in"],["studentPhone","Student phone"],["parentPhone","Parent phone"]];
   const updP=(i,f,v)=>setD(x=>({...x,payments:x.payments.map((p,j)=>j===i?{...p,[f]:v}:p)}));
   const addP=()=>setD(x=>({...x,payments:[...x.payments,{id:uid(),label:"Additional payment",amount:0,paid:false}]}));
   const delP=i=>setD(x=>({...x,payments:x.payments.filter((_,j)=>j!==i)}));
@@ -696,34 +694,42 @@ function StudentModal({student,onSave,onClose,info={},onSaveInfo,hw,onOpenReport
       ))}
       <OutBtn onClick={addP} style={{width:"100%",textAlign:"center",margin:"4px 0 24px",borderStyle:"dashed",color:G1}}>+ Add Extra Payment</OutBtn>
 
-      {/* Student information — lives with the payment details, not a separate section */}
-      {onSaveInfo&&(
-        <div style={{borderTop:`2px solid ${G2}`,paddingTop:16,marginBottom:24}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,gap:8}}>
-            <Lbl>🗂️ Student information</Lbl>
-            <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0,marginBottom:8}}>
-              {hw&&hw.count>0&&<span style={{background:hw.rate>=80?"#E3F5EA":hw.rate>=60?"#FFF3DC":"#FDECEC",color:hw.rate>=80?GOOD:hw.rate>=60?"#B8770B":BAD,borderRadius:20,padding:"4px 10px",fontSize:11,fontWeight:800}}>HW {hw.rate}%</span>}
-              {onOpenReport&&<button onClick={onOpenReport} style={{background:"none",border:"none",color:YD,fontWeight:800,fontSize:12.5,cursor:"pointer",padding:0}}>📊 Report ›</button>}
-            </div>
-          </div>
-          <div style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:14,padding:"2px 14px",marginBottom:12}}>
-            {INFO_FIELDS.map(([k,l],i)=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"11px 0",borderBottom:i<INFO_FIELDS.length-1||info.notes?`1px solid ${G2}`:"none"}}>
-                <span style={{color:G1,fontSize:13.5,flexShrink:0}}>{l}</span>
-                <span style={{fontWeight:700,fontSize:13.5,textAlign:"right",color:info[k]?TXT:G2,overflow:"hidden",textOverflow:"ellipsis"}}>{info[k]||"—"}</span>
-              </div>
-            ))}
-            {info.notes&&<div style={{padding:"11px 0"}}><div style={{color:G1,fontSize:13.5,marginBottom:4}}>Notes</div><div style={{fontWeight:600,fontSize:13.5,lineHeight:1.5}}>{info.notes}</div></div>}
-          </div>
-          <OutBtn onClick={()=>setEditInfo(true)} style={{width:"100%",textAlign:"center",fontSize:14}}>✎ Edit information</OutBtn>
-        </div>
-      )}
-
       <div style={{display:"flex",gap:10,position:"sticky",bottom:0,background:BG2,paddingTop:4}}>
         <OutBtn onClick={onClose} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
         <YBtn onClick={()=>onSave(d)} style={{flex:2,textAlign:"center"}}>Save Changes</YBtn>
       </div>
-      {editInfo&&<PortfolioEditModal name={d.name||"Student"} data={info} onSave={(v)=>{onSaveInfo(v);setEditInfo(false);}} onClose={()=>setEditInfo(false)}/>}
+    </Overlay>
+  );
+}
+
+// ── Student Portfolio Modal — student information, opened from its own button on the row ──
+function StudentPortfolioModal({name,info={},onSaveInfo,hw,onOpenReport,onClose}){
+  const[editInfo,setEditInfo]=useState(false);
+  const INFO_FIELDS=[["gradeYear","Course year"],["studyPlace","Place of study"],["livingPlace","Lives in"],["studentPhone","Student phone"],["parentPhone","Parent phone"]];
+  return(
+    <Overlay onClose={onClose}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <span style={{color:TXT,fontWeight:800,fontSize:20,display:"flex",alignItems:"center",gap:8,minWidth:0}}><span style={{fontSize:22,flexShrink:0}}>🗂️</span><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name||"Student"}</span></span>
+        <IconBtn onClick={onClose} label="Close">✕</IconBtn>
+      </div>
+      <div style={{color:G1,fontSize:13,fontWeight:600,marginBottom:18}}>Student portfolio</div>
+      {(hw&&hw.count>0)||onOpenReport?(
+        <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
+          {hw&&hw.count>0&&<span style={{background:hw.rate>=80?"#E3F5EA":hw.rate>=60?"#FFF3DC":"#FDECEC",color:hw.rate>=80?GOOD:hw.rate>=60?"#B8770B":BAD,borderRadius:20,padding:"4px 10px",fontSize:11,fontWeight:800}}>HW {hw.rate}%</span>}
+          {onOpenReport&&<button onClick={onOpenReport} style={{background:"none",border:"none",color:YD,fontWeight:800,fontSize:12.5,cursor:"pointer",padding:0,marginLeft:"auto"}}>📊 Report ›</button>}
+        </div>
+      ):null}
+      <div style={{background:BG3,border:`1.5px solid ${G2}`,borderRadius:14,padding:"2px 14px",marginBottom:16}}>
+        {INFO_FIELDS.map(([k,l],i)=>(
+          <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"11px 0",borderBottom:i<INFO_FIELDS.length-1||info.notes?`1px solid ${G2}`:"none"}}>
+            <span style={{color:G1,fontSize:13.5,flexShrink:0}}>{l}</span>
+            <span style={{fontWeight:700,fontSize:13.5,textAlign:"right",color:info[k]?TXT:G2,overflow:"hidden",textOverflow:"ellipsis"}}>{info[k]||"—"}</span>
+          </div>
+        ))}
+        {info.notes&&<div style={{padding:"11px 0"}}><div style={{color:G1,fontSize:13.5,marginBottom:4}}>Notes</div><div style={{fontWeight:600,fontSize:13.5,lineHeight:1.5}}>{info.notes}</div></div>}
+      </div>
+      {onSaveInfo&&<OutBtn onClick={()=>setEditInfo(true)} style={{width:"100%",textAlign:"center",fontSize:14}}>✎ Edit information</OutBtn>}
+      {editInfo&&<PortfolioEditModal name={name||"Student"} data={info} onSave={(v)=>{onSaveInfo(v);setEditInfo(false);}} onClose={()=>setEditInfo(false)}/>}
     </Overlay>
   );
 }
@@ -735,6 +741,7 @@ function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfol
   const[nm,setNm]=useState("");
   const[delSt,setDelSt]=useState(null);
   const[menuSt,setMenuSt]=useState(null);
+  const[portSt,setPortSt]=useState(null);
   const totalDue=group.students.reduce((s,st)=>s+st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0),0);
   const totalPaid=group.students.reduce((s,st)=>s+st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
   const pct=totalDue>0?Math.min(100,(totalPaid/totalDue)*100):0;
@@ -782,6 +789,7 @@ function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfol
                 <div style={{color:TXT,fontWeight:700,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{st.name||"Unnamed"}</div>
                 <div style={{color:full?GOOD:G1,fontSize:12.5,marginTop:3,fontWeight:600}}>{full?`✓ Fully paid (${fmt(paid)})`:`${fmt(paid)} of ${fmt(due)}`}</div>
               </div>
+              <IconBtn onClick={e=>{e.stopPropagation();setPortSt(st);}} label="Student portfolio" style={{fontSize:18}}>🗂️</IconBtn>
               <IconBtn onClick={e=>{e.stopPropagation();setMenuSt(st);}} label="More options" style={{fontSize:22,fontWeight:800}}>⋯</IconBtn>
               <div style={{color:G1,fontSize:20,flexShrink:0}}>›</div>
             </div>
@@ -805,13 +813,14 @@ function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfol
         {icon:"🗑",label:"Delete student",danger:true,onClick:()=>{setDelSt(menuSt);setMenuSt(null);}},
       ]}/>}
       {delSt&&<Confirm title="Delete student?" message={`"${delSt.name||"This student"}" will be removed from Payments and Performance — including payment records, homework history and personal info.`} onConfirm={()=>{removeSt(delSt.id);setDelSt(null);}} onClose={()=>setDelSt(null)}/>}
-      {editSt&&(()=>{
-        const pid=editSt.pid||editSt.id;
-        return <StudentModal student={editSt} onSave={saveSt} onClose={()=>setEditSt(null)}
+      {editSt&&<StudentModal student={editSt} onSave={saveSt} onClose={()=>setEditSt(null)}/>}
+      {portSt&&(()=>{
+        const pid=portSt.pid||portSt.id;
+        return <StudentPortfolioModal name={portSt.name||"Student"} onClose={()=>setPortSt(null)}
           info={portfolios[pid]||{}}
           onSaveInfo={onSavePortfolio?(v)=>onSavePortfolio(pid,v):undefined}
           hw={hwRateFor?hwRateFor(pid):undefined}
-          onOpenReport={onOpenStudentReport?()=>{setEditSt(null);onOpenStudentReport(pid);}:undefined}/>;
+          onOpenReport={onOpenStudentReport?()=>{setPortSt(null);onOpenStudentReport(pid);}:undefined}/>;
       })()}
     </div>
   );
@@ -2091,7 +2100,7 @@ function App(){
   const peopleCount=Object.keys(rosterByPid(groups)).length;
   const enterPerformance=()=>{ if(perfMonth==null){setPerfMonth(latest.month);setPerfYear(latest.year);} setView("performance"); };
   const sections=[
-    {ico:"💳",bg:YSOFT,title:"Payments",sub:`Fees & who paid · student info inside 🗂️ · ${peopleCount} students`,go:()=>setView("payments")},
+    {ico:"💳",bg:YSOFT,title:"Payments",sub:`Fees & who paid · tap 🗂️ for a student's portfolio · ${peopleCount} students`,go:()=>setView("payments")},
     {ico:"📈",bg:"#E3F5EA",title:"Performance",sub:"Typed homework tracking · reports & charts",go:enterPerformance},
   ];
   return(
@@ -2152,7 +2161,7 @@ function App(){
 
         <div style={{background:YSOFT,border:`1px solid ${YD}`,borderRadius:14,padding:"13px 15px",marginTop:16,display:"flex",gap:10,alignItems:"flex-start"}}>
           <span style={{fontSize:17}}>🔗</span>
-          <div style={{fontSize:12.5,color:"#5a4a00",lineHeight:1.5}}>Student info lives inside <b>Payments → group → student</b>. Both sections share the same students — add or delete once, it updates everywhere.</div>
+          <div style={{fontSize:12.5,color:"#5a4a00",lineHeight:1.5}}>Open a student's portfolio with the <b>🗂️ button</b> next to their name in <b>Payments → group</b>. Both sections share the same students — add or delete once, it updates everywhere.</div>
         </div>
       </div>
 
