@@ -15,6 +15,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
   :root{
@@ -72,6 +73,19 @@ const _idb=(()=>{
 async function _fsWrite(handle,obj){ const w=await handle.createWritable(); await w.write(JSON.stringify(obj,null,2)); await w.close(); }
 async function _fsRead(handle){ const f=await handle.getFile(); const t=await f.text(); return t&&t.trim()?JSON.parse(t):null; }
 window._fs={ FS_SUPPORTED, idb:_idb, write:_fsWrite, read:_fsRead };
+
+// ── Optional cloud account sync (Supabase) ───────────────────────────
+// Sign in with an account to keep the SAME data on your computer and phone.
+// To turn it on, fill in the two values below with YOUR Supabase project's
+// URL and "anon"/publishable key (see SYNC-SETUP.md). Both are meant to be
+// public — your data is protected by row-level security, so it's safe to
+// commit them here. Leave them blank to keep the app local-only.
+const SUPABASE_URL="";      // e.g. "https://abcdefgh.supabase.co"
+const SUPABASE_ANON_KEY=""; // e.g. "eyJhbGciOiJIUzI1NiIs...."
+window._syncEnabled = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
+window._sb = window._syncEnabled
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{persistSession:true,autoRefreshToken:true}})
+  : null;
 </script>
 <script type="text/babel">
 const{useState,useMemo,useEffect,useCallback,useRef}=React;
@@ -1629,6 +1643,11 @@ function StudentReport({pid,groups,perf,onBack,onExport}){
 
 // ── Main App ──
 const loadObj=(k)=>{ try{const s=localStorage.getItem(k)||sessionStorage.getItem(k); if(s){const o=JSON.parse(s); if(o&&typeof o==="object"&&!Array.isArray(o))return o;} }catch(e){} return {}; };
+// Stable string of the *meaningful* data in a snapshot (ignores the savedAt
+// timestamp). Used to skip pushing/applying data that hasn't actually changed,
+// which prevents sync feedback loops between devices.
+const SYNC_TS_KEY="myClassesSyncTs";
+const syncContent=(s)=>{ try{return JSON.stringify({g:s.groups,n:s.newcomers,p:s.portfolios,f:s.performance,t:s.teacherPct});}catch(e){return "";} };
 function App(){
   const[groups,setGroups]=useState(()=>{
     const d=window._loadData(SAVE_KEY);
@@ -1664,6 +1683,19 @@ function App(){
   const fileHandleRef=useRef(null);
   const loadedRef=useRef(false);
   const saveTimerRef=useRef(null);
+
+  // ── Optional cloud account sync (shared across computer + phone) ──
+  const SYNC=window._syncEnabled, sb=window._sb;
+  const[session,setSession]=useState(null);
+  const[authEmail,setAuthEmail]=useState("");
+  const[authPass,setAuthPass]=useState("");
+  const[authBusy,setAuthBusy]=useState(false);
+  const[authMsg,setAuthMsg]=useState("");
+  const[syncState,setSyncState]=useState("off"); // off|syncing|synced|error
+  const pushTimerRef=useRef(null);
+  const pulledRef=useRef(false);          // true once the first pull for this session finished
+  const lastSyncContentRef=useRef(null);  // last data string we pushed or applied (loop guard)
+  const localTsRef=useRef((()=>{ try{return localStorage.getItem(SYNC_TS_KEY)||null;}catch(e){return null;} })());
 
   const snapshot=()=>({v:1,savedAt:new Date().toISOString(),groups,newcomers,portfolios,performance,teacherPct});
   const applyParsed=(parsed)=>{
@@ -1715,6 +1747,111 @@ function App(){
     },700);
     return()=>clearTimeout(saveTimerRef.current);
   },[groups,newcomers,portfolios,performance,teacherPct,fileState]);
+
+  // ── Cloud sync helpers ──
+  const doPush=async(uid)=>{
+    if(!SYNC||!sb||!uid)return;
+    const snap=snapshot(); const content=syncContent(snap);
+    if(content===lastSyncContentRef.current){ setSyncState("synced"); return; }
+    setSyncState("syncing");
+    const ts=new Date().toISOString();
+    const{error}=await sb.from("user_data").upsert({user_id:uid,data:snap,updated_at:ts});
+    if(error){ setSyncState("error"); return; }
+    lastSyncContentRef.current=content;
+    localTsRef.current=ts; try{localStorage.setItem(SYNC_TS_KEY,ts);}catch(e){}
+    setSyncState("synced");
+  };
+  const pullOnce=async(uid)=>{
+    if(!SYNC||!sb||!uid)return;
+    setSyncState("syncing");
+    try{
+      const{data,error}=await sb.from("user_data").select("data,updated_at").eq("user_id",uid).maybeSingle();
+      if(error)throw error;
+      if(data&&data.data&&Array.isArray(data.data.groups)){
+        const remoteAt=data.updated_at||data.data.savedAt||"";
+        const localTs=localTsRef.current;
+        if(!localTs||remoteAt>localTs){
+          applyParsed(data.data);
+          lastSyncContentRef.current=syncContent(data.data);
+          localTsRef.current=remoteAt; try{localStorage.setItem(SYNC_TS_KEY,remoteAt);}catch(e){}
+          setSyncState("synced");
+        }else{
+          lastSyncContentRef.current=null; // local is newer → force a push
+          await doPush(uid);
+        }
+      }else{
+        lastSyncContentRef.current=null; // no cloud row yet → seed from this device
+        await doPush(uid);
+      }
+      pulledRef.current=true;
+    }catch(e){ setSyncState("error"); }
+  };
+  const signIn=async()=>{
+    if(!sb)return; setAuthBusy(true); setAuthMsg("");
+    const{error}=await sb.auth.signInWithPassword({email:authEmail.trim().toLowerCase(),password:authPass});
+    setAuthBusy(false);
+    if(error)setAuthMsg(error.message||"Sign-in failed"); else{ setAuthPass(""); setAuthMsg(""); }
+  };
+  const signUp=async()=>{
+    if(!sb)return; setAuthBusy(true); setAuthMsg("");
+    const{data,error}=await sb.auth.signUp({email:authEmail.trim().toLowerCase(),password:authPass});
+    setAuthBusy(false);
+    if(error){ setAuthMsg(error.message||"Could not create account"); return; }
+    if(data&&data.session){ setAuthPass(""); setAuthMsg(""); }
+    else setAuthMsg("Account created. Check your email to confirm, then sign in.");
+  };
+  const signOut=async()=>{
+    try{ await sb.auth.signOut(); }catch(e){}
+    pulledRef.current=false; lastSyncContentRef.current=null; setSyncState("off");
+  };
+  const syncNow=async()=>{ if(session&&session.user)await pullOnce(session.user.id); };
+
+  // Track sign-in state
+  useEffect(()=>{
+    if(!SYNC||!sb)return;
+    let sub;
+    sb.auth.getSession().then(({data})=>setSession((data&&data.session)||null)).catch(()=>{});
+    try{ const r=sb.auth.onAuthStateChange((_e,s)=>setSession(s||null)); sub=r.data.subscription; }catch(e){}
+    return()=>{ try{sub&&sub.unsubscribe();}catch(e){} };
+  },[]);
+
+  // On sign-in: pull cloud data, then listen for live changes from other devices
+  useEffect(()=>{
+    if(!SYNC||!sb||!session||!session.user){ pulledRef.current=false; return; }
+    const uid=session.user.id; let channel;
+    pullOnce(uid).then(()=>{
+      try{
+        channel=sb.channel("user_data_"+uid)
+          .on("postgres_changes",{event:"*",schema:"public",table:"user_data",filter:"user_id=eq."+uid},(payload)=>{
+            const row=payload&&payload.new; if(!row||!row.data||!Array.isArray(row.data.groups))return;
+            const content=syncContent(row.data);
+            if(content===lastSyncContentRef.current)return; // our own change echoed back
+            applyParsed(row.data);
+            lastSyncContentRef.current=content;
+            const ts=row.updated_at||row.data.savedAt||new Date().toISOString();
+            localTsRef.current=ts; try{localStorage.setItem(SYNC_TS_KEY,ts);}catch(e){}
+          })
+          .subscribe();
+      }catch(e){}
+    });
+    return()=>{ try{channel&&sb.removeChannel(channel);}catch(e){} };
+  },[session]);
+
+  // Remember when local data last changed (used to resolve pull conflicts)
+  useEffect(()=>{
+    if(!loadedRef.current)return;
+    const ts=new Date().toISOString();
+    localTsRef.current=ts; try{localStorage.setItem(SYNC_TS_KEY,ts);}catch(e){}
+  },[groups,newcomers,portfolios,performance,teacherPct]);
+
+  // Debounced push to the cloud whenever data changes (only while signed in)
+  useEffect(()=>{
+    if(!SYNC||!sb||!session||!session.user||!pulledRef.current)return;
+    const uid=session.user.id;
+    clearTimeout(pushTimerRef.current);
+    pushTimerRef.current=setTimeout(()=>{ doPush(uid); },700);
+    return()=>clearTimeout(pushTimerRef.current);
+  },[groups,newcomers,portfolios,performance,teacherPct,session]);
 
   const linkFile=async()=>{
     try{
@@ -2193,6 +2330,44 @@ function App(){
               </div>
               <div style={{flex:1,textAlign:"right",fontSize:12.5,color:G1}}>You keep <b style={{color:TXT}}>{teacherPct}%</b> · center gets <b style={{color:TXT}}>{100-teacherPct}%</b></div>
             </div>
+          </div>
+
+          {/* Account & sync across devices */}
+          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+            <div style={{color:TXT,fontWeight:800,fontSize:15,marginBottom:2}}>☁️ Account &amp; sync</div>
+            <div style={{color:G1,fontSize:12,marginBottom:12}}>Sign in to keep the same data on your computer and phone</div>
+            {!SYNC&&(
+              <div style={{color:G1,fontSize:13,lineHeight:1.5,background:BG2,border:`1px solid ${G2}`,borderRadius:10,padding:"11px 13px"}}>
+                Cloud sync isn't set up for this app yet. See <b>SYNC-SETUP.md</b> to connect a free account backend (a one-time setup), then reload the app.
+              </div>
+            )}
+            {SYNC&&!session&&(
+              <>
+                <Inp type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} style={{background:BG2,marginBottom:8}}/>
+                <Inp type="password" placeholder="Password" value={authPass} onChange={e=>setAuthPass(e.target.value)} style={{background:BG2,marginBottom:10}}/>
+                <div style={{display:"flex",gap:8}}>
+                  <YBtn onClick={()=>{ if(!authBusy&&authEmail&&authPass)signIn(); }} style={{flex:1,textAlign:"center",opacity:(authBusy||!authEmail||!authPass)?0.5:1}}>{authBusy?"…":"Sign in"}</YBtn>
+                  <OutBtn onClick={()=>{ if(!authBusy&&authEmail&&authPass)signUp(); }} style={{flex:1,textAlign:"center",opacity:(authBusy||!authEmail||!authPass)?0.5:1}}>Create account</OutBtn>
+                </div>
+                {authMsg&&<div style={{color:BAD,fontSize:12.5,marginTop:10,lineHeight:1.45}}>{authMsg}</div>}
+                <div style={{color:G1,fontSize:12,lineHeight:1.5,marginTop:10}}>Use the same email &amp; password on every device. Your latest changes then sync automatically.</div>
+              </>
+            )}
+            {SYNC&&session&&(
+              <>
+                <div style={{display:"flex",alignItems:"center",gap:8,fontSize:13.5,marginBottom:8}}>
+                  {syncState==="syncing"&&<span style={{color:PART,fontWeight:800}}>⟳ Syncing…</span>}
+                  {syncState==="synced"&&<span style={{color:GOOD,fontWeight:800}}>✓ Synced across your devices</span>}
+                  {syncState==="error"&&<span style={{color:BAD,fontWeight:800}}>⚠ Sync error — will retry</span>}
+                  {syncState==="off"&&<span style={{color:G1,fontWeight:800}}>Connected</span>}
+                </div>
+                <div style={{color:G1,fontSize:12.5,marginBottom:10}}>Signed in as <b style={{color:TXT}}>{session.user&&session.user.email}</b></div>
+                <div style={{display:"flex",gap:8}}>
+                  <OutBtn onClick={syncNow} style={{flex:1,textAlign:"center"}}>Sync now</OutBtn>
+                  <OutBtn onClick={signOut} style={{flex:1,textAlign:"center"}}>Sign out</OutBtn>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Auto-save to a file on this computer */}

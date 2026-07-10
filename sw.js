@@ -1,4 +1,4 @@
-const CACHE = "myclasses-v5";
+const CACHE = "myclasses-v6";
 
 self.addEventListener("install", e => {
   e.waitUntil(self.skipWaiting());
