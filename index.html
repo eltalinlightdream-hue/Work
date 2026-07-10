@@ -80,8 +80,8 @@ window._fs={ FS_SUPPORTED, idb:_idb, write:_fsWrite, read:_fsRead };
 // URL and "anon"/publishable key (see SYNC-SETUP.md). Both are meant to be
 // public — your data is protected by row-level security, so it's safe to
 // commit them here. Leave them blank to keep the app local-only.
-const SUPABASE_URL="";      // e.g. "https://abcdefgh.supabase.co"
-const SUPABASE_ANON_KEY=""; // e.g. "eyJhbGciOiJIUzI1NiIs...."
+const SUPABASE_URL="https://wvhhroiteltxeuorpive.supabase.co";
+const SUPABASE_ANON_KEY="sb_publishable_E6iQrf9CnYnBTD92VdpDcA_gyvx1pUh"; // publishable (public) key — safe to commit
 window._syncEnabled = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
 window._sb = window._syncEnabled
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{persistSession:true,autoRefreshToken:true}})
