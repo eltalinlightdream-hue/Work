@@ -59,6 +59,19 @@ const PERF_KEY="myClassesPerformance_v1";
 function saveData(key,data){ const s=JSON.stringify(data); try{localStorage.setItem(key,s);}catch(e){} try{sessionStorage.setItem(key,s);}catch(e){} }
 function loadData(key){ try{ const d=localStorage.getItem(key)||sessionStorage.getItem(key); if(d){const p=JSON.parse(d);if(Array.isArray(p))return p;} }catch(e){} return null; }
 window._saveData=saveData; window._loadData=loadData;
+
+// ── Optional "save to a file on this computer" (File System Access API) ──
+// A FileSystemFileHandle can't live in localStorage, so it's kept in IndexedDB.
+const FS_SUPPORTED = typeof window.showSaveFilePicker === "function";
+const _idb=(()=>{
+  const DB="myClassesFS", ST="h";
+  const open=()=>new Promise((res,rej)=>{ const r=indexedDB.open(DB,1); r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains(ST)) r.result.createObjectStore(ST); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+  const run=(mode,fn)=>open().then(db=>new Promise((res,rej)=>{ const tx=db.transaction(ST,mode); const rq=fn(tx.objectStore(ST)); tx.oncomplete=()=>res(rq&&rq.result); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); }));
+  return { get:(k)=>run("readonly",st=>st.get(k)), set:(k,v)=>run("readwrite",st=>st.put(v,k)), del:(k)=>run("readwrite",st=>st.delete(k)) };
+})();
+async function _fsWrite(handle,obj){ const w=await handle.createWritable(); await w.write(JSON.stringify(obj,null,2)); await w.close(); }
+async function _fsRead(handle){ const f=await handle.getFile(); const t=await f.text(); return t&&t.trim()?JSON.parse(t):null; }
+window._fs={ FS_SUPPORTED, idb:_idb, write:_fsWrite, read:_fsRead };
 </script>
 <script type="text/babel">
 const{useState,useMemo,useEffect,useCallback,useRef}=React;
@@ -1634,6 +1647,88 @@ function App(){
   const[teacherPct,setTeacherPct]=useState(TEACHER_PCT);
   const changePct=(v)=>setTeacherPct(setTeacherPctGlobal(v));
 
+  // ── Optional auto-save to a file on this computer ──
+  const[fileState,setFileState]=useState(FS_SUPPORTED?"off":"unsupported"); // off|connected|reconnect|unsupported
+  const[fileName,setFileName]=useState("");
+  const[installEvt,setInstallEvt]=useState(null);
+  const[bannerHidden,setBannerHidden]=useState(false);
+  const fileHandleRef=useRef(null);
+  const loadedRef=useRef(false);
+  const saveTimerRef=useRef(null);
+
+  const snapshot=()=>({v:1,savedAt:new Date().toISOString(),groups,newcomers,portfolios,performance,teacherPct});
+  const applyParsed=(parsed)=>{
+    if(!parsed)return false;
+    const migrate=arr=>arr.map(g=>({...g,students:(g.students||[]).map(st=>st.pid?st:{...st,pid:st.id})}));
+    if(Array.isArray(parsed)){ setGroups(migrate(parsed)); return true; }
+    if(Array.isArray(parsed.groups)){
+      setGroups(migrate(parsed.groups));
+      setNewcomers(Array.isArray(parsed.newcomers)?parsed.newcomers:[]);
+      if(parsed.portfolios&&typeof parsed.portfolios==="object")setPortfolios(parsed.portfolios);
+      if(parsed.performance&&typeof parsed.performance==="object")setPerformance(parsed.performance);
+      if(typeof parsed.teacherPct==="number")changePct(parsed.teacherPct);
+      return true;
+    }
+    return false;
+  };
+
+  // On open: reconnect a previously linked file (silent if permission persists — installed PWA)
+  useEffect(()=>{
+    let cancelled=false;
+    const onBIP=(e)=>{ e.preventDefault(); setInstallEvt(e); };
+    window.addEventListener("beforeinstallprompt",onBIP);
+    if(!FS_SUPPORTED){ loadedRef.current=true; return()=>window.removeEventListener("beforeinstallprompt",onBIP); }
+    (async()=>{
+      try{
+        const handle=await window._fs.idb.get("linkedFile");
+        if(!handle||cancelled)return;
+        fileHandleRef.current=handle; setFileName(handle.name||"my-classes.json");
+        let perm="prompt";
+        try{ perm=await handle.queryPermission({mode:"readwrite"}); }catch(e){}
+        if(cancelled)return;
+        if(perm==="granted"){
+          try{ const data=await window._fs.read(handle); if(data)applyParsed(data); }catch(e){}
+          setFileState("connected");
+        }else{ setFileState("reconnect"); }
+      }catch(e){}
+      finally{ setTimeout(()=>{ loadedRef.current=true; },0); }
+    })();
+    return()=>{ cancelled=true; window.removeEventListener("beforeinstallprompt",onBIP); };
+  },[]);
+
+  // Debounced write to the linked file whenever anything changes
+  useEffect(()=>{
+    if(fileState!=="connected"||!fileHandleRef.current||!loadedRef.current)return;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current=setTimeout(async()=>{
+      try{ await window._fs.write(fileHandleRef.current,snapshot()); }
+      catch(e){ setFileState("reconnect"); }
+    },700);
+    return()=>clearTimeout(saveTimerRef.current);
+  },[groups,newcomers,portfolios,performance,teacherPct,fileState]);
+
+  const linkFile=async()=>{
+    try{
+      const handle=await window.showSaveFilePicker({suggestedName:"my-classes.json",types:[{description:"My Classes data",accept:{"application/json":[".json"]}}]});
+      fileHandleRef.current=handle; setFileName(handle.name||"my-classes.json");
+      await window._fs.idb.set("linkedFile",handle);
+      loadedRef.current=true;
+      await window._fs.write(handle,snapshot());
+      setFileState("connected"); setBannerHidden(false);
+      setRestoreMsg("✓ Linked & saving to "+(handle.name||"file")); setTimeout(()=>setRestoreMsg(""),3000);
+    }catch(e){ /* picker cancelled */ }
+  };
+  const reconnectFile=async()=>{
+    const handle=fileHandleRef.current; if(!handle)return;
+    try{
+      const perm=await handle.requestPermission({mode:"readwrite"});
+      if(perm==="granted"){ try{ const data=await window._fs.read(handle); if(data)applyParsed(data); }catch(e){} loadedRef.current=true; setFileState("connected"); }
+    }catch(e){}
+  };
+  const saveNow=async()=>{ if(!fileHandleRef.current)return; try{ await window._fs.write(fileHandleRef.current,snapshot()); setRestoreMsg("✓ Saved to file"); setTimeout(()=>setRestoreMsg(""),2500); }catch(e){ setFileState("reconnect"); } };
+  const unlinkFile=async()=>{ try{ await window._fs.idb.del("linkedFile"); }catch(e){} fileHandleRef.current=null; setFileName(""); setFileState("off"); };
+  const doInstall=async()=>{ if(!installEvt)return; installEvt.prompt(); try{ await installEvt.userChoice; }catch(e){} setInstallEvt(null); };
+
   // Auto-save
   useEffect(()=>{
     window._saveData(SAVE_KEY,groups);
@@ -1790,17 +1885,7 @@ function App(){
     const reader=new FileReader();
     reader.onload=(ev)=>{
       try{
-        const parsed=JSON.parse(ev.target.result);
-        if(Array.isArray(parsed)){
-          setGroups(parsed);
-        }else if(parsed&&Array.isArray(parsed.groups)){
-          setGroups(parsed.groups.map(g=>({...g,students:(g.students||[]).map(st=>st.pid?st:{...st,pid:st.id})})));
-          setNewcomers(Array.isArray(parsed.newcomers)?parsed.newcomers:[]);
-          if(parsed.portfolios&&typeof parsed.portfolios==="object")setPortfolios(parsed.portfolios);
-          if(parsed.performance&&typeof parsed.performance==="object")setPerformance(parsed.performance);
-        }else{
-          throw new Error();
-        }
+        if(!applyParsed(JSON.parse(ev.target.result)))throw new Error();
         setRestoreMsg("✓ Restored!");
         setTimeout(()=>setRestoreMsg(""),3000);
       }catch{
@@ -2039,6 +2124,18 @@ function App(){
           </div>
         </div>
 
+        {fileState==="reconnect"&&!bannerHidden&&(
+          <div style={{background:YSOFT,border:`1.5px solid ${YD}`,borderRadius:14,padding:"12px 14px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:20}}>🔌</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:"#5a4a00",fontWeight:800,fontSize:13.5}}>Reconnect your save file</div>
+              <div style={{color:"#8a7400",fontSize:11.5,marginTop:1}}>Tap to keep saving to {fileName||"your file"}</div>
+            </div>
+            <YBtn onClick={reconnectFile} style={{padding:"9px 14px",minHeight:40,fontSize:13.5}}>Reconnect</YBtn>
+            <IconBtn onClick={()=>setBannerHidden(true)} label="Dismiss" style={{width:36,height:36,minWidth:36,background:"transparent",border:"none",color:"#8a7400"}}>✕</IconBtn>
+          </div>
+        )}
+
         <Lbl>Sections</Lbl>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           {sections.map(c=>(
@@ -2087,6 +2184,48 @@ function App(){
               </div>
               <div style={{flex:1,textAlign:"right",fontSize:12.5,color:G1}}>You keep <b style={{color:TXT}}>{teacherPct}%</b> · center gets <b style={{color:TXT}}>{100-teacherPct}%</b></div>
             </div>
+          </div>
+
+          {/* Auto-save to a file on this computer */}
+          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+            <div style={{color:TXT,fontWeight:800,fontSize:15,marginBottom:2}}>💾 Auto-save to a file</div>
+            <div style={{color:G1,fontSize:12,marginBottom:12}}>Save every change straight to a file on this computer</div>
+            {fileState==="unsupported"&&(
+              <div style={{color:G1,fontSize:13,lineHeight:1.5,background:BG2,border:`1px solid ${G2}`,borderRadius:10,padding:"11px 13px"}}>
+                This works in <b>Chrome</b> or <b>Edge</b> on a computer. On this browser/phone, your data still saves automatically in the app — use <b>Back up / Restore</b> below to move it around.
+              </div>
+            )}
+            {fileState==="off"&&(
+              <>
+                <YBtn onClick={linkFile} style={{width:"100%",textAlign:"center",marginBottom:10}}>🔗 Link a save file</YBtn>
+                <div style={{color:G1,fontSize:12,lineHeight:1.5,marginBottom:installEvt?12:0}}>Pick a file once (e.g. in Documents). After that every change writes to it automatically and the app loads from it when you open it.</div>
+                {installEvt&&(
+                  <div style={{background:YSOFT,border:`1px solid ${YD}`,borderRadius:10,padding:"11px 13px"}}>
+                    <div style={{fontSize:12.5,color:"#5a4a00",lineHeight:1.5,marginBottom:9}}>Tip: <b>install the app</b> once, then link your file and choose <b>"allow on every visit"</b> — after that it opens and saves with no clicks.</div>
+                    <OutBtn onClick={doInstall} style={{width:"100%",textAlign:"center",background:BG2}}>⬇ Install app</OutBtn>
+                  </div>
+                )}
+              </>
+            )}
+            {fileState==="reconnect"&&(
+              <>
+                <div style={{color:"#5a4a00",fontSize:12.5,lineHeight:1.5,marginBottom:10,background:YSOFT,border:`1px solid ${YD}`,borderRadius:10,padding:"10px 12px"}}>Your file <b>{fileName||"my-classes.json"}</b> is linked. Tap below to reconnect it for this session.</div>
+                <YBtn onClick={reconnectFile} style={{width:"100%",textAlign:"center",marginBottom:8}}>🔌 Reconnect save file</YBtn>
+                <OutBtn onClick={unlinkFile} style={{width:"100%",textAlign:"center"}}>Unlink</OutBtn>
+              </>
+            )}
+            {fileState==="connected"&&(
+              <>
+                <div style={{display:"flex",alignItems:"center",gap:8,color:GOOD,fontWeight:800,fontSize:13.5,marginBottom:10}}>
+                  <span>✓</span> Auto-saving to <span style={{color:TXT}}>{fileName||"my-classes.json"}</span>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <OutBtn onClick={saveNow} style={{flex:1,textAlign:"center"}}>Save now</OutBtn>
+                  <OutBtn onClick={unlinkFile} style={{flex:1,textAlign:"center"}}>Unlink</OutBtn>
+                </div>
+                {installEvt&&<OutBtn onClick={doInstall} style={{width:"100%",textAlign:"center",marginTop:8,background:BG2}}>⬇ Install app (for click-free opening)</OutBtn>}
+              </>
+            )}
           </div>
 
           <button onClick={doBackup} style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:BG3,border:`1px solid ${G2}`,borderRadius:14,color:TXT,padding:"15px 16px",cursor:"pointer",fontSize:15,fontWeight:700,marginBottom:10}}>
