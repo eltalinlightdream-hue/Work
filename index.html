@@ -148,12 +148,18 @@ function recStat(rec){
 const missedTypes=(rec)=>(rec&&typeof rec==="object")?Object.keys(rec).filter(k=>!rec[k]):[];
 const scheduleFromName=(name="")=>/odd/i.test(name)?"odd":"even";
 const iso=(y,m,d)=>`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-// Even/odd calendar-day dates for a given month
+// Weekday-based lesson dates for a given month.
+// Odd groups meet Mon/Wed/Fri, even groups meet Tue/Thu/Sat; Sunday is never a class day.
 function parityDatesForMonth(year,monthIdx,parity){
   const days=new Date(year,monthIdx+1,0).getDate();
   const want=parity==="even";
   const out=[];
-  for(let d=1;d<=days;d++){ if(want===(d%2===0)) out.push(iso(year,monthIdx,d)); }
+  for(let d=1;d<=days;d++){
+    const wd=new Date(year,monthIdx,d).getDay(); // 0=Sun..6=Sat
+    if(wd===0) continue;                          // no Sunday classes
+    const isEvenDay=wd%2===0;                      // Tue/Thu/Sat
+    if(want===isEvenDay) out.push(iso(year,monthIdx,d));
+  }
   return out;
 }
 // Completion % — partial counts as half
@@ -900,6 +906,7 @@ function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfol
 function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDeleteGroup,onCreateGroup,allGroups,onRequestPDF}){
   const[creating,setCreating]=useState(false);
   const[cName,setCName]=useState("");
+  const[cSchedule,setCSchedule]=useState("even");
   const[delGrp,setDelGrp]=useState(null);
   const[menuGrp,setMenuGrp]=useState(null);
   const label=`${MONTHS[monthIdx]} ${year}`;
@@ -910,8 +917,8 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
 
   const create=()=>{
     if(!cName.trim())return;
-    onCreateGroup({id:uid(),name:cName.trim(),month:monthIdx,year,students:[]});
-    setCName("");setCreating(false);
+    onCreateGroup({id:uid(),name:cName.trim(),schedule:cSchedule,month:monthIdx,year,students:[]});
+    setCName("");setCSchedule("even");setCreating(false);
   };
 
   const exportPDF=()=>onRequestPDF?onRequestPDF(monthIdx,year):generatePDF(groups,monthIdx,year,allGroups);
@@ -971,7 +978,16 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
           <div style={{fontWeight:W.bold,fontSize:T.h2,color:TXT,marginBottom:4}}>New Group</div>
           <div style={{color:G1,fontSize:13,marginBottom:18}}>{label}</div>
           <Lbl>Group Name</Lbl>
-          <Inp placeholder="e.g. Even 13:00" autoFocus value={cName} onChange={e=>setCName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&create()} style={{marginBottom:22}}/>
+          <Inp placeholder="e.g. Even 13:00" autoFocus value={cName} onChange={e=>setCName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&create()} style={{marginBottom:18}}/>
+          <Lbl>Lesson Days</Lbl>
+          <Segmented value={cSchedule} onChange={setCSchedule} options={[{key:"even",label:"Even"},{key:"odd",label:"Odd"}]}/>
+          <div style={{fontSize:T.label,color:G1,marginTop:8,marginBottom:14}}>{cSchedule==="even"?"Tuesday, Thursday, Saturday":"Monday, Wednesday, Friday"}</div>
+          <Lbl>Quick fill · lesson time</Lbl>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:22}}>
+            {["8:00","9:00","10:00","13:00","15:00","17:00"].map(t=>(
+              <button key={t} onClick={()=>setCName(`${cSchedule==="even"?"Even":"Odd"} ${t}`)} style={{background:BG3,border:`1px solid ${G2}`,color:TXT,borderRadius:R.sm,padding:"7px 13px",fontSize:T.sub,fontWeight:W.semi,cursor:"pointer"}}>{t}</button>
+            ))}
+          </div>
           <div style={{display:"flex",gap:10}}>
             <OutBtn onClick={()=>setCreating(false)} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
             <YBtn onClick={create} style={{flex:2,textAlign:"center"}}>Create Group</YBtn>
@@ -2008,7 +2024,7 @@ function App(){
     setPerformance(p=>{
       const ex=p[g.id];
       if(ex&&ex.lessons&&Object.keys(ex.lessons).length&&ex.types&&ex.types.length)return p;
-      const schedule=(ex&&ex.schedule)||scheduleFromName(g.name);
+      const schedule=(ex&&ex.schedule)||g.schedule||scheduleFromName(g.name);
       const types=(ex&&ex.types&&ex.types.length)?ex.types:DEFAULT_TYPES.slice();
       const lessons=(ex&&ex.lessons)?{...ex.lessons}:{};
       if(!Object.keys(lessons).length)parityDatesForMonth(g.year,g.month,schedule).forEach(d=>lessons[d]={records:{}});
@@ -2167,7 +2183,7 @@ function App(){
   if(view==="perf-group"&&selGroup){
     const grp=groups.find(g=>g.id===selGroup);
     if(!grp){setView("performance");return null;}
-    const gp=performance[grp.id]||{schedule:scheduleFromName(grp.name),defaultHomework:"",lessons:{}};
+    const gp=performance[grp.id]||{schedule:grp.schedule||scheduleFromName(grp.name),defaultHomework:"",lessons:{}};
     return shell(<HomeworkGrid group={grp} gp={gp} monthIdx={grp.month} year={grp.year}
       onBack={()=>setView("performance")} onChange={(ngp)=>updatePerf(grp.id,ngp)}
       onOpenReport={(name)=>{setReportGroup({name,month:grp.month,year:grp.year,back:"perf-group"});setView("perf-report");}}
