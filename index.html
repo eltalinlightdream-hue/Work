@@ -981,7 +981,13 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
           <Inp placeholder="e.g. Even 13:00" autoFocus value={cName} onChange={e=>setCName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&create()} style={{marginBottom:18}}/>
           <Lbl>Lesson Days</Lbl>
           <Segmented value={cSchedule} onChange={setCSchedule} options={[{key:"even",label:"Even"},{key:"odd",label:"Odd"}]}/>
-          <div style={{fontSize:T.label,color:G1,marginTop:8,marginBottom:22}}>{cSchedule==="even"?"Tuesday, Thursday, Saturday":"Monday, Wednesday, Friday"}</div>
+          <div style={{fontSize:T.label,color:G1,marginTop:8,marginBottom:14}}>{cSchedule==="even"?"Tuesday, Thursday, Saturday":"Monday, Wednesday, Friday"}</div>
+          <Lbl>Quick fill · lesson time</Lbl>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:22}}>
+            {["8:00","9:00","10:00","13:00","15:00","17:00"].map(t=>(
+              <button key={t} onClick={()=>setCName(`${cSchedule==="even"?"Even":"Odd"} ${t}`)} style={{background:BG3,border:`1px solid ${G2}`,color:TXT,borderRadius:R.sm,padding:"7px 13px",fontSize:T.sub,fontWeight:W.semi,cursor:"pointer"}}>{t}</button>
+            ))}
+          </div>
           <div style={{display:"flex",gap:10}}>
             <OutBtn onClick={()=>setCreating(false)} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
             <YBtn onClick={create} style={{flex:2,textAlign:"center"}}>Create Group</YBtn>
