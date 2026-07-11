@@ -776,14 +776,14 @@ function StudentPortfolioModal({name,info={},onSaveInfo,hw,onOpenReport,onClose}
   return(
     <Overlay onClose={onClose}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-        <span style={{color:TXT,fontWeight:800,fontSize:20,display:"flex",alignItems:"center",gap:8,minWidth:0}}><span style={{fontSize:22,flexShrink:0}}>🗂️</span><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name||"Student"}</span></span>
-        <IconBtn onClick={onClose} label="Close">✕</IconBtn>
+        <span style={{color:TXT,fontWeight:W.bold,fontSize:T.h2,display:"flex",alignItems:"center",gap:9,minWidth:0}}><Icon name="folder" size={20} color={G1} style={{flexShrink:0}}/><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name||"Student"}</span></span>
+        <IconBtn onClick={onClose} label="Close"><Icon name="close" size={18}/></IconBtn>
       </div>
-      <div style={{color:G1,fontSize:13,fontWeight:600,marginBottom:18}}>Student portfolio</div>
+      <div style={{color:G1,fontSize:T.sub,fontWeight:W.med,marginBottom:18}}>Student portfolio</div>
       {(hw&&hw.count>0)||onOpenReport?(
         <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
-          {hw&&hw.count>0&&<span style={{background:hw.rate>=80?"#E3F5EA":hw.rate>=60?"#FFF3DC":"#FDECEC",color:hw.rate>=80?GOOD:hw.rate>=60?"#B8770B":BAD,borderRadius:20,padding:"4px 10px",fontSize:11,fontWeight:800}}>HW {hw.rate}%</span>}
-          {onOpenReport&&<button onClick={onOpenReport} style={{background:"none",border:"none",color:YD,fontWeight:800,fontSize:12.5,cursor:"pointer",padding:0,marginLeft:"auto"}}>📊 Report ›</button>}
+          {hw&&hw.count>0&&<span style={{background:hw.rate>=80?"#E3F5EA":hw.rate>=60?"#FFF3DC":"#FDECEC",color:hw.rate>=80?GOOD:hw.rate>=60?PARTTX:BAD,borderRadius:R.pill,padding:"4px 10px",fontSize:T.label,fontWeight:W.semi}}>HW {hw.rate}%</span>}
+          {onOpenReport&&<button onClick={onOpenReport} style={{background:"none",border:"none",color:YD,fontWeight:W.semi,fontSize:T.sub,cursor:"pointer",padding:0,marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:5}}><Icon name="chart" size={15} color={YD}/> Report ›</button>}
         </div>
       ):null}
       <div style={{background:BG3,border:`1.5px solid ${G2}`,borderRadius:14,padding:"2px 14px",marginBottom:16}}>
@@ -821,25 +821,26 @@ function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfol
         <BackBtn onClick={onBack}/>
         <div style={{flex:1,minWidth:0}}>
           <div style={{color:G1,fontSize:12,fontWeight:600}}>{monthLabel}</div>
-          <div style={{color:TXT,fontWeight:800,fontSize:19,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{group.name}</div>
+          <div style={{color:TXT,fontWeight:W.bold,fontSize:T.h2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{group.name}</div>
         </div>
       </div>
-      <div style={{background:Y,borderRadius:R_CARD,padding:"22px 24px",marginBottom:22,boxShadow:SH2}}>
-        <div style={{color:"#00000088",fontSize:11,fontWeight:800,letterSpacing:"0.1em",marginBottom:6}}>GROUP TOTAL PAYMENT</div>
-        <div style={{fontSize:32,fontWeight:900,color:"#000",marginBottom:18,letterSpacing:"-1px"}}>{fmt(totalDue)}</div>
+      <div style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R_CARD,padding:"18px 20px",marginBottom:20,boxShadow:SH1}}>
+        <div style={{color:G3,fontSize:T.label,fontWeight:W.semi,letterSpacing:"0.07em",textTransform:"uppercase"}}>Group total payment</div>
+        <div style={{fontSize:28,fontWeight:W.heavy,color:TXT,margin:"6px 0 4px",letterSpacing:"-0.5px"}}>{fmt(totalDue)}</div>
+        <div style={{width:34,height:3,borderRadius:2,background:Y,marginBottom:16}}/>
         <div style={{display:"flex",flexWrap:"wrap",gap:22}}>
-          {[["COLLECTED",fmt(totalPaid),"#000"],["REMAINING",fmt(totalDue-totalPaid),"#5a4a00"],["STUDENTS",group.students.length,"#000"]].map(([l,v,c])=>(
-            <div key={l}><div style={{color:"#00000077",fontSize:10,fontWeight:700,letterSpacing:"0.05em"}}>{l}</div><div style={{color:c,fontWeight:800,fontSize:16,marginTop:2}}>{v}</div></div>
+          {[["COLLECTED",fmt(totalPaid)],["REMAINING",fmt(totalDue-totalPaid)],["STUDENTS",group.students.length]].map(([l,v])=>(
+            <div key={l}><div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.03em",textTransform:"uppercase"}}>{l}</div><div style={{color:TXT,fontWeight:W.semi,fontSize:T.body,marginTop:3}}>{v}</div></div>
           ))}
         </div>
-        <div style={{marginTop:16,height:6,background:"rgba(0,0,0,.15)",borderRadius:4}}>
-          <div style={{height:"100%",borderRadius:4,background:"#000",width:`${pct}%`,transition:"width .4s"}}/>
+        <div style={{marginTop:16,height:5,background:BG3,borderRadius:R.pill}}>
+          <div style={{height:"100%",borderRadius:R.pill,background:Y,width:`${pct}%`,transition:"width .4s"}}/>
         </div>
-        <div style={{color:"#00000077",fontSize:11,fontWeight:700,marginTop:6,textAlign:"right"}}>{Math.round(pct)}% collected</div>
+        <div style={{color:G3,fontSize:T.label,fontWeight:W.semi,marginTop:7,textAlign:"right"}}>{Math.round(pct)}% collected</div>
       </div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <span style={{color:TXT,fontWeight:800,fontSize:17}}>Students</span>
-        <span style={{color:G1,fontSize:13,fontWeight:600}}>{group.students.length}</span>
+        <span style={{color:TXT,fontWeight:W.semi,fontSize:T.title}}>Students</span>
+        <span style={{color:G1,fontSize:T.sub,fontWeight:W.med}}>{group.students.length}</span>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {group.students.length===0&&<div style={{color:G1,textAlign:"center",padding:"44px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2}}>No students yet.<br/>Tap <b>+ Student</b> to add one.</div>}
@@ -848,17 +849,17 @@ function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfol
           const paid=st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0);
           const full=due>0&&paid>=due;
           return(
-            <div key={st.id} onClick={()=>setEditSt(st)} className="tap" style={{background:BG2,border:`1.5px solid ${full?YD:G2}`,borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,boxShadow:SH1,cursor:"pointer"}}>
-              <div style={{width:42,height:42,borderRadius:"50%",background:full?Y:BG3,border:`2px solid ${full?YD:G2}`,display:"flex",alignItems:"center",justifyContent:"center",color:full?"#000":TXT,fontWeight:800,fontSize:17,flexShrink:0}}>
+            <div key={st.id} onClick={()=>setEditSt(st)} className="tap" style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R.md,padding:"11px 13px",display:"flex",alignItems:"center",gap:11,boxShadow:SH1,cursor:"pointer"}}>
+              <div style={{width:40,height:40,borderRadius:R.sm,background:BG3,display:"flex",alignItems:"center",justifyContent:"center",color:G1,fontWeight:W.semi,fontSize:T.body,flexShrink:0}}>
                 {(st.name||"?").charAt(0).toUpperCase()}
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{color:TXT,fontWeight:700,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{st.name||"Unnamed"}</div>
-                <div style={{color:full?GOOD:G1,fontSize:12.5,marginTop:3,fontWeight:600}}>{full?`✓ Fully paid (${fmt(paid)})`:`${fmt(paid)} of ${fmt(due)}`}</div>
+                <div style={{color:TXT,fontWeight:W.semi,fontSize:T.body,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{st.name||"Unnamed"}</div>
+                <div style={{color:full?GOOD:G1,fontSize:T.sub,marginTop:2,fontWeight:W.med}}>{full?`Fully paid · ${fmt(paid)}`:`${fmt(paid)} of ${fmt(due)}`}</div>
               </div>
-              <IconBtn onClick={e=>{e.stopPropagation();setPortSt(st);}} label="Student portfolio" style={{fontSize:18}}>🗂️</IconBtn>
-              <IconBtn onClick={e=>{e.stopPropagation();setMenuSt(st);}} label="More options" style={{fontSize:22,fontWeight:800}}>⋯</IconBtn>
-              <div style={{color:G1,fontSize:20,flexShrink:0}}>›</div>
+              <IconBtn onClick={e=>{e.stopPropagation();setPortSt(st);}} label="Student portfolio" style={{width:38,height:38,minWidth:38,background:"transparent",border:"none"}}><Icon name="folder" size={19} color={G1}/></IconBtn>
+              <IconBtn onClick={e=>{e.stopPropagation();setMenuSt(st);}} label="More options" style={{width:38,height:38,minWidth:38,background:"transparent",border:"none"}}><Icon name="more" size={19} color={G1}/></IconBtn>
+              <Icon name="chevron" size={18} color={G3} style={{flexShrink:0}}/>
             </div>
           );
         })}
@@ -918,19 +919,19 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
         <BackBtn onClick={onBack}/>
         <div style={{flex:1,minWidth:0}}>
-          <h2 style={{margin:0,color:TXT,fontSize:21,fontWeight:800}}>{label}</h2>
-          <div style={{color:G1,fontSize:13}}>{mg.length} group{mg.length!==1?"s":""}</div>
+          <h2 style={{margin:0,color:TXT,fontSize:T.h1,fontWeight:W.bold}}>{label}</h2>
+          <div style={{color:G1,fontSize:T.sub,fontWeight:W.med}}>{mg.length} group{mg.length!==1?"s":""}</div>
         </div>
-        <button onClick={exportPDF} aria-label="Export PDF" style={{background:"#111",border:"none",borderRadius:12,color:"#fff",height:44,padding:"0 16px",cursor:"pointer",fontSize:14,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>📄 PDF</button>
+        <button onClick={exportPDF} aria-label="Export PDF" style={{background:TXT,border:"none",borderRadius:R.md,color:"#fff",height:44,padding:"0 16px",cursor:"pointer",fontSize:T.sub,fontWeight:W.semi,display:"flex",alignItems:"center",gap:6}}><Icon name="file" size={16} color="#fff"/> PDF</button>
       </div>
-      <div style={{background:Y,borderRadius:R_CARD,padding:"20px 22px",marginBottom:22,boxShadow:SH2}}>
+      <div style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R_CARD,padding:"18px 20px",marginBottom:20,boxShadow:SH1}}>
         <div style={{display:"flex",flexWrap:"wrap",gap:22}}>
-          <div><div style={{color:"#00000077",fontSize:10,fontWeight:700,letterSpacing:"0.05em"}}>MONTH TOTAL</div><div style={{color:"#000",fontWeight:900,fontSize:22,marginTop:2,letterSpacing:"-0.5px"}}>{fmt(totalDue)}</div></div>
-          <div><div style={{color:"#00000077",fontSize:10,fontWeight:700,letterSpacing:"0.05em"}}>COLLECTED</div><div style={{color:"#000",fontWeight:800,fontSize:22,marginTop:2,letterSpacing:"-0.5px"}}>{fmt(totalPaid)}</div></div>
-          <div><div style={{color:"#00000077",fontSize:10,fontWeight:700,letterSpacing:"0.05em"}}>REMAINING</div><div style={{color:"#5a4a00",fontWeight:800,fontSize:22,marginTop:2,letterSpacing:"-0.5px"}}>{fmt(totalDue-totalPaid)}</div></div>
+          <div><div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.03em",textTransform:"uppercase"}}>Month total</div><div style={{color:TXT,fontWeight:W.heavy,fontSize:22,marginTop:2,letterSpacing:"-0.5px"}}>{fmt(totalDue)}</div></div>
+          <div><div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.03em",textTransform:"uppercase"}}>Collected</div><div style={{color:TXT,fontWeight:W.semi,fontSize:22,marginTop:2,letterSpacing:"-0.5px"}}>{fmt(totalPaid)}</div></div>
+          <div><div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.03em",textTransform:"uppercase"}}>Remaining</div><div style={{color:TXT,fontWeight:W.semi,fontSize:22,marginTop:2,letterSpacing:"-0.5px"}}>{fmt(totalDue-totalPaid)}</div></div>
         </div>
-        <div style={{marginTop:16,height:6,background:"rgba(0,0,0,.15)",borderRadius:4}}>
-          <div style={{height:"100%",borderRadius:4,background:"#000",width:`${pct}%`,transition:"width .4s"}}/>
+        <div style={{marginTop:16,height:5,background:BG3,borderRadius:R.pill}}>
+          <div style={{height:"100%",borderRadius:R.pill,background:Y,width:`${pct}%`,transition:"width .4s"}}/>
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -940,23 +941,23 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
           const paid=g.students.reduce((s,st)=>s+st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
           const pct=due>0?Math.min(100,(paid/due)*100):0;
           return(
-            <div key={g.id} onClick={()=>onSelectGroup(g.id)} className="tap" style={{background:BG2,border:`1.5px solid ${G2}`,borderLeft:`5px solid ${Y}`,borderRadius:14,padding:"15px 16px 15px 18px",cursor:"pointer",boxShadow:SH1}}>
+            <div key={g.id} onClick={()=>onSelectGroup(g.id)} className="tap" style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R.md,padding:"14px 16px",cursor:"pointer",boxShadow:SH1}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                 <div style={{minWidth:0}}>
-                  <div style={{color:TXT,fontWeight:800,fontSize:16,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div>
-                  <div style={{color:G1,fontSize:13,marginTop:2}}>{g.students.length} student{g.students.length!==1?"s":""} · {Math.round(pct)}% collected</div>
+                  <div style={{color:TXT,fontWeight:W.semi,fontSize:T.title,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div>
+                  <div style={{color:G1,fontSize:T.sub,marginTop:2,fontWeight:W.med}}>{g.students.length} student{g.students.length!==1?"s":""} · {Math.round(pct)}% collected</div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                  <IconBtn onClick={e=>{e.stopPropagation();setMenuGrp(g);}} label="More options" style={{fontSize:22,fontWeight:800}}>⋯</IconBtn>
-                  <div style={{color:G1,fontSize:20}}>›</div>
+                <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                  <IconBtn onClick={e=>{e.stopPropagation();setMenuGrp(g);}} label="More options" style={{width:38,height:38,minWidth:38,background:"transparent",border:"none"}}><Icon name="more" size={19} color={G1}/></IconBtn>
+                  <Icon name="chevron" size={18} color={G3}/>
                 </div>
               </div>
               <div style={{marginTop:12,display:"flex",gap:24}}>
-                <div><div style={{color:G1,fontSize:10,fontWeight:700,letterSpacing:"0.05em"}}>TOTAL</div><div style={{color:TXT,fontWeight:800,fontSize:14,marginTop:1}}>{fmt(due)}</div></div>
-                <div><div style={{color:G1,fontSize:10,fontWeight:700,letterSpacing:"0.05em"}}>COLLECTED</div><div style={{color:"#000",fontWeight:800,fontSize:14,marginTop:1}}>{fmt(paid)}</div></div>
+                <div><div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.03em",textTransform:"uppercase"}}>Total</div><div style={{color:TXT,fontWeight:W.semi,fontSize:T.sub,marginTop:1}}>{fmt(due)}</div></div>
+                <div><div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.03em",textTransform:"uppercase"}}>Collected</div><div style={{color:TXT,fontWeight:W.semi,fontSize:T.sub,marginTop:1}}>{fmt(paid)}</div></div>
               </div>
-              <div style={{marginTop:10,height:5,background:BG3,borderRadius:4}}>
-                <div style={{height:"100%",borderRadius:4,background:Y,width:`${pct}%`,transition:"width .4s"}}/>
+              <div style={{marginTop:10,height:5,background:BG3,borderRadius:R.pill}}>
+                <div style={{height:"100%",borderRadius:R.pill,background:Y,width:`${pct}%`,transition:"width .4s"}}/>
               </div>
             </div>
           );
@@ -1002,10 +1003,10 @@ function PaymentSummary({groups}){
   });
 
   return(
-    <div style={{background:BG2,border:`1px solid ${G2}`,borderRadius:16,marginBottom:24,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-      <div onClick={()=>setOpen(o=>!o)} style={{background:Y,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-        <span style={{color:"#000",fontWeight:800,fontSize:15}}>📊 Summary of All Months</span>
-        <span style={{color:"#000",fontSize:18}}>{open?"▲":"▼"}</span>
+    <div style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R.lg,marginBottom:24,overflow:"hidden",boxShadow:SH1}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{background:BG2,borderBottom:open?`1px solid ${G2}`:"none",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+        <span style={{color:TXT,fontWeight:W.semi,fontSize:T.title,display:"flex",alignItems:"center",gap:9}}><Icon name="chart" size={17} color={G1}/> Summary of all months</span>
+        <Icon name="chevronDown" size={18} color={G1} style={{transform:open?"rotate(180deg)":"none",transition:"transform .2s"}}/>
       </div>
       {open&&(
         <div style={{padding:0}}>
@@ -1032,38 +1033,38 @@ function PaymentSummary({groups}){
               <div key={key} style={{borderBottom:`1px solid ${G2}`}}>
                 <div onClick={()=>toggleMonth(key)} className="tap" style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",cursor:"pointer"}}>
                   <div style={{minWidth:0}}>
-                    <div style={{color:TXT,fontWeight:800,fontSize:15}}>{MONTHS[month]} {year}</div>
-                    <div style={{color:G1,fontSize:12,marginTop:2}}>{mg.length} groups · {allStudents.length} students</div>
+                    <div style={{color:TXT,fontWeight:W.semi,fontSize:T.body}}>{MONTHS[month]} {year}</div>
+                    <div style={{color:G1,fontSize:T.sub,marginTop:2,fontWeight:W.med}}>{mg.length} groups · {allStudents.length} students</div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
                     <div style={{textAlign:"right"}}>
-                      <div style={{color:G1,fontSize:9.5,fontWeight:700,letterSpacing:"0.05em"}}>COLLECTED</div>
-                      <div style={{color:TXT,fontWeight:800,fontSize:14}}>{fmt(totalPaid)}</div>
+                      <div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.05em",textTransform:"uppercase"}}>Collected</div>
+                      <div style={{color:TXT,fontWeight:W.semi,fontSize:T.sub}}>{fmt(totalPaid)}</div>
                     </div>
-                    <span style={{color:G1,fontSize:16}}>{isExp?"▲":"▼"}</span>
+                    <Icon name="chevronDown" size={16} color={G3} style={{transform:isExp?"rotate(180deg)":"none",transition:"transform .2s"}}/>
                   </div>
                 </div>
                 {isExp&&(
                   <div style={{padding:"0 20px 18px"}}>
                     {/* Key figures */}
-                    <div style={{display:"flex",flexWrap:"wrap",gap:0,marginBottom:12,background:BG3,borderRadius:10,overflow:"hidden"}}>
-                      {[["TOTAL BILLED",fmt(totalDue),TXT],["COLLECTED",fmt(totalPaid),"#000"],["UNCOLLECTED",fmt(uncollected),"#c00"],[`YOUR (${TEACHER_PCT}%)`,fmt(totalPaid*(TEACHER_PCT/100)),"#000"]].map(([l,v,c],i,arr)=>(
+                    <div style={{display:"flex",flexWrap:"wrap",gap:0,marginBottom:12,background:BG3,borderRadius:R.sm,overflow:"hidden"}}>
+                      {[["TOTAL BILLED",fmt(totalDue),TXT],["COLLECTED",fmt(totalPaid),TXT],["UNCOLLECTED",fmt(uncollected),BAD],[`YOUR (${TEACHER_PCT}%)`,fmt(totalPaid*(TEACHER_PCT/100)),TXT]].map(([l,v,c],i,arr)=>(
                         <div key={l} style={{flex:"1 1 100px",padding:"10px 14px",borderRight:i<arr.length-1?`1px solid ${G2}`:"none"}}>
-                          <div style={{color:G1,fontSize:10,fontWeight:700,letterSpacing:"0.06em",marginBottom:3}}>{l}</div>
-                          <div style={{color:c,fontWeight:800,fontSize:13}}>{v}</div>
+                          <div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.05em",marginBottom:3,textTransform:"uppercase"}}>{l}</div>
+                          <div style={{color:c,fontWeight:W.semi,fontSize:T.sub}}>{v}</div>
                         </div>
                       ))}
                     </div>
                     {/* Payment breakdown */}
                     {bdEntries.length>0&&(
                       <div>
-                        <div style={{color:G1,fontSize:11,fontWeight:700,letterSpacing:"0.07em",marginBottom:8}}>PAYMENT BREAKDOWN</div>
+                        <div style={{color:G3,fontSize:T.label,fontWeight:W.semi,letterSpacing:"0.07em",marginBottom:8,textTransform:"uppercase"}}>Payment breakdown</div>
                         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                           {bdEntries.map(([amt,cnt])=>(
-                            <div key={amt} style={{background:Y,borderRadius:8,padding:"5px 12px",display:"flex",alignItems:"center",gap:6}}>
-                              <span style={{color:"#000",fontWeight:700,fontSize:13}}>{fmtShort(Number(amt))}</span>
-                              <span style={{color:"#00000088",fontSize:11}}>×{cnt}</span>
-                              <span style={{color:"#444",fontSize:11}}>= {fmtShort(Number(amt)*cnt)}</span>
+                            <div key={amt} style={{background:BG3,border:`1px solid ${G2}`,borderRadius:R.sm,padding:"5px 12px",display:"flex",alignItems:"center",gap:6}}>
+                              <span style={{color:TXT,fontWeight:W.semi,fontSize:T.sub}}>{fmtShort(Number(amt))}</span>
+                              <span style={{color:G1,fontSize:T.label}}>×{cnt}</span>
+                              <span style={{color:G1,fontSize:T.label}}>= {fmtShort(Number(amt)*cnt)}</span>
                             </div>
                           ))}
                         </div>
@@ -2188,22 +2189,22 @@ function App(){
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
             <BackBtn onClick={()=>setView("home")}/>
             <div style={{flex:1,minWidth:0}}>
-              <h2 style={{margin:0,color:TXT,fontSize:21,fontWeight:800}}>Payments</h2>
-              <div style={{color:G1,fontSize:13}}>{activeMonths.length} month{activeMonths.length!==1?"s":""}</div>
+              <h2 style={{margin:0,color:TXT,fontSize:T.h1,fontWeight:W.bold}}>Payments</h2>
+              <div style={{color:G1,fontSize:T.sub,fontWeight:W.med}}>{activeMonths.length} month{activeMonths.length!==1?"s":""}</div>
             </div>
           </div>
 
-          <div onClick={()=>setView("newcomers")} className="tap" style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:16,padding:"16px 18px",marginBottom:22,display:"flex",alignItems:"center",gap:14,cursor:"pointer",boxShadow:SH1}}>
-            <div style={{width:44,height:44,borderRadius:12,background:YSOFT,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>📇</div>
+          <div onClick={()=>setView("newcomers")} className="tap" style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R.lg,padding:"15px 18px",marginBottom:22,display:"flex",alignItems:"center",gap:14,cursor:"pointer",boxShadow:SH1}}>
+            <div style={{width:44,height:44,borderRadius:R.md,background:BG3,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="user" size={21} color={TXT} stroke={1.7}/></div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{color:TXT,fontWeight:800,fontSize:16}}>Newcomers</div>
-              <div style={{color:G1,fontSize:12.5,marginTop:2}}>{newcomers.length} student{newcomers.length!==1?"s":""} tracked</div>
+              <div style={{color:TXT,fontWeight:W.semi,fontSize:T.title}}>Newcomers</div>
+              <div style={{color:G1,fontSize:T.sub,marginTop:2,fontWeight:W.med}}>{newcomers.length} student{newcomers.length!==1?"s":""} tracked</div>
             </div>
-            <div style={{color:G1,fontSize:20,flexShrink:0}}>›</div>
+            <Icon name="chevron" size={20} color={G3} style={{flexShrink:0}}/>
           </div>
 
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-            <span style={{color:TXT,fontWeight:800,fontSize:18}}>Months <span style={{color:G1,fontWeight:500,fontSize:14}}>· {activeMonths.length}</span></span>
+            <span style={{color:TXT,fontWeight:W.semi,fontSize:T.h2}}>Months <span style={{color:G1,fontWeight:W.med,fontSize:T.body}}>· {activeMonths.length}</span></span>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:26}}>
             {activeMonths.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2}}>No months yet.<br/>Tap <b>+ Month</b> to start.</div>}
@@ -2214,31 +2215,31 @@ function App(){
               const isCurrent=month===NOW_MONTH&&year===NOW_YEAR;
               return(
                 <div key={`${year}-${month}-card`} onClick={()=>{setSelMonth(month);setView("month");}} className="tap"
-                  style={{background:BG2,border:`1.5px solid ${isCurrent?YD:G2}`,borderRadius:16,padding:"16px 18px",cursor:"pointer",boxShadow:SH1}}>
+                  style={{background:BG2,border:`1px solid ${isCurrent?YD:G2}`,borderRadius:R.lg,padding:"16px 18px",cursor:"pointer",boxShadow:SH1}}>
                   <div style={{display:"flex",alignItems:"center",gap:14}}>
-                    <div style={{background:isCurrent?Y:BG3,borderRadius:12,padding:"8px 12px",textAlign:"center",flexShrink:0,minWidth:60}}>
-                      <div style={{color:isCurrent?"#000":G1,fontSize:11,fontWeight:800,letterSpacing:"0.05em"}}>{MONTHS[month].slice(0,3).toUpperCase()}</div>
-                      <div style={{color:isCurrent?"#000":TXT,fontSize:18,fontWeight:900}}>{year}</div>
+                    <div style={{background:isCurrent?Y:BG3,borderRadius:R.md,padding:"8px 12px",textAlign:"center",flexShrink:0,minWidth:60}}>
+                      <div style={{color:isCurrent?TXT:G1,fontSize:T.label,fontWeight:W.semi,letterSpacing:"0.05em"}}>{MONTHS[month].slice(0,3).toUpperCase()}</div>
+                      <div style={{color:isCurrent?TXT:TXT,fontSize:T.h2,fontWeight:W.bold}}>{year}</div>
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{color:TXT,fontWeight:800,fontSize:16}}>{MONTHS[month]}</span>
-                        {isCurrent&&<span style={{background:Y,color:"#000",fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:20}}>NOW</span>}
+                        <span style={{color:TXT,fontWeight:W.semi,fontSize:T.title}}>{MONTHS[month]}</span>
+                        {isCurrent&&<span style={{background:Y,color:TXT,fontSize:T.micro,fontWeight:W.bold,padding:"2px 8px",borderRadius:R.pill}}>NOW</span>}
                       </div>
-                      <div style={{color:G1,fontSize:12.5,marginTop:2}}>{gc} group{gc!==1?"s":""} · {sc} student{sc!==1?"s":""}</div>
+                      <div style={{color:G1,fontSize:T.sub,marginTop:2,fontWeight:W.med}}>{gc} group{gc!==1?"s":""} · {sc} student{sc!==1?"s":""}</div>
                     </div>
-                    <div style={{color:G1,fontSize:20,flexShrink:0}}>›</div>
+                    <Icon name="chevron" size={20} color={G3} style={{flexShrink:0}}/>
                   </div>
-                  <div style={{marginTop:14,display:"flex",flexWrap:"wrap",gap:0,background:BG3,borderRadius:12,overflow:"hidden"}}>
-                    {[["BILLED",fmt(due),TXT],["COLLECTED",fmt(paid),"#000"],[`YOUR (${TEACHER_PCT}%)`,fmt(myIncome),"#000"]].map(([l,v,c],i,arr)=>(
+                  <div style={{marginTop:14,display:"flex",flexWrap:"wrap",gap:0,background:BG3,borderRadius:R.md,overflow:"hidden"}}>
+                    {[["BILLED",fmt(due)],["COLLECTED",fmt(paid)],[`YOUR (${TEACHER_PCT}%)`,fmt(myIncome)]].map(([l,v],i,arr)=>(
                       <div key={l} style={{flex:"1 1 90px",padding:"10px 12px",borderRight:i<arr.length-1?`1px solid ${G2}`:"none"}}>
-                        <div style={{color:G1,fontSize:9.5,fontWeight:800,letterSpacing:"0.04em",marginBottom:3}}>{l}</div>
-                        <div style={{color:c,fontWeight:800,fontSize:13}}>{v}</div>
+                        <div style={{color:G3,fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.04em",marginBottom:3,textTransform:"uppercase"}}>{l}</div>
+                        <div style={{color:TXT,fontWeight:W.semi,fontSize:T.sub}}>{v}</div>
                       </div>
                     ))}
                   </div>
-                  <div style={{marginTop:10,height:5,background:BG3,borderRadius:4}}>
-                    <div style={{height:"100%",borderRadius:4,background:Y,width:`${pctv}%`,transition:"width .4s"}}/>
+                  <div style={{marginTop:10,height:5,background:BG3,borderRadius:R.pill}}>
+                    <div style={{height:"100%",borderRadius:R.pill,background:Y,width:`${pctv}%`,transition:"width .4s"}}/>
                   </div>
                 </div>
               );
