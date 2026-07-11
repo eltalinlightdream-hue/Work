@@ -45,6 +45,13 @@
   ::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px;}
   @keyframes sheetUp{from{transform:translateY(24px);opacity:0;}to{transform:translateY(0);opacity:1;}}
   @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  /* Responsive: mobile-first single column; wider content + 2-col lists on desktop */
+  .page{max-width:760px;margin:0 auto;}
+  .list2{display:flex;flex-direction:column;gap:10px;}
+  @media(min-width:900px){
+    .page{max-width:1040px;}
+    .list2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
+  }
 </style>
 </head>
 <body>
@@ -850,8 +857,8 @@ function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfol
         <span style={{color:TXT,fontWeight:W.semi,fontSize:T.title}}>Students</span>
         <span style={{color:G1,fontSize:T.sub,fontWeight:W.med}}>{group.students.length}</span>
       </div>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {group.students.length===0&&<div style={{color:G1,textAlign:"center",padding:"44px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2}}>No students yet.<br/>Tap <b>+ Student</b> to add one.</div>}
+      <div className="list2">
+        {group.students.length===0&&<div style={{color:G1,textAlign:"center",padding:"44px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2,gridColumn:"1/-1"}}>No students yet.<br/>Tap <b>+ Student</b> to add one.</div>}
         {group.students.map(st=>{
           const due=st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0);
           const paid=st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0);
@@ -943,8 +950,8 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
           <div style={{height:"100%",borderRadius:R.pill,background:Y,width:`${pct}%`,transition:"width .4s"}}/>
         </div>
       </div>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {mg.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2}}>No groups yet.<br/>Tap <b>+ Group</b> to create one.</div>}
+      <div className="list2">
+        {mg.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2,gridColumn:"1/-1"}}>No groups yet.<br/>Tap <b>+ Group</b> to create one.</div>}
         {mg.map(g=>{
           const due=g.students.reduce((s,st)=>s+st.payments.reduce((a,p)=>a+(Number(p.amount)||0),0),0);
           const paid=g.students.reduce((s,st)=>s+st.payments.filter(p=>p.paid).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
@@ -1157,8 +1164,8 @@ function NewcomersView({newcomers,groups,onBack,onAdd,onUpdate,onDelete}){
           <div style={{color:G1,fontSize:T.sub,fontWeight:W.med}}>{newcomers.length} student{newcomers.length!==1?"s":""}</div>
         </div>
       </div>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {sorted.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1.5px dashed ${G2}`,borderRadius:R.md,background:BG2}}>No newcomers yet.<br/>Tap <b>+ Newcomer</b> to add one.</div>}
+      <div className="list2">
+        {sorted.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1.5px dashed ${G2}`,borderRadius:R.md,background:BG2,gridColumn:"1/-1"}}>No newcomers yet.<br/>Tap <b>+ Newcomer</b> to add one.</div>}
         {sorted.map(nc=>(
           <div key={nc.id} onClick={()=>setEditItem(nc)} className="tap" style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R.md,padding:"12px 14px",display:"flex",alignItems:"center",gap:11,boxShadow:SH1,cursor:"pointer"}}>
             <div style={{width:40,height:40,borderRadius:R.sm,background:BG3,display:"flex",alignItems:"center",justifyContent:"center",color:G1,fontWeight:W.semi,fontSize:T.body,flexShrink:0}}>
@@ -1224,8 +1231,8 @@ function PerformanceHome({monthIdx,year,groups,perf,activeMonths,onBack,onOpenGr
         </div>
       </div>
       <Lbl>Groups</Lbl>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {mg.length===0&&<div style={{color:G1,textAlign:"center",padding:"44px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2}}>No groups this month.<br/>Add them in the <b>Payments</b> section first.</div>}
+      <div className="list2">
+        {mg.length===0&&<div style={{color:G1,textAlign:"center",padding:"44px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2,gridColumn:"1/-1"}}>No groups this month.<br/>Add them in the <b>Payments</b> section first.</div>}
         {mg.map(g=>{
           const q=groupTally(perf,g);
           const good=q.rate>=80, warn=q.rate>=60&&q.rate<80;
@@ -2120,7 +2127,7 @@ function App(){
   if(view==="newcomers"){
     return(
       <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
-        <div style={{maxWidth:760,margin:"0 auto"}}>
+        <div className="page">
           <NewcomersView newcomers={newcomers} groups={groups}
             onBack={()=>setView("payments")}
             onAdd={addNewcomer} onUpdate={updNewcomer} onDelete={delNewcomer}/>
@@ -2135,7 +2142,7 @@ function App(){
     if(!grp){setView("month");return null;}
     return(
       <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
-        <div style={{maxWidth:760,margin:"0 auto"}}>
+        <div className="page">
           <GroupView group={grp} monthLabel={`${MONTHS[grp.month]} ${grp.year}`}
             onBack={()=>setView("month")} onUpdate={g=>{updGroup(g);}}
             portfolios={portfolios} onSavePortfolio={savePortfolio}
@@ -2150,7 +2157,7 @@ function App(){
   if(view==="month"&&selMonth!==null){
     return(
       <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
-        <div style={{maxWidth:760,margin:"0 auto"}}>
+        <div className="page">
           <MonthView monthIdx={selMonth} year={NOW_YEAR} groups={groups}
             onBack={()=>setView("payments")}
             onSelectGroup={id=>{setSelGroup(id);setView("group");}}
@@ -2167,7 +2174,7 @@ function App(){
   const savedTag=saved?<div style={{position:"fixed",bottom:"calc(26px + var(--safe-bottom))",left:"max(18px,var(--safe-left))",background:TXT,color:"#fff",borderRadius:R.pill,padding:"8px 15px",fontSize:T.sub,fontWeight:W.semi,boxShadow:SH2,zIndex:901,display:"inline-flex",alignItems:"center",gap:6}}><Icon name="check" size={15} color={Y}/> Saved</div>:null;
   const shell=(inner)=>(
     <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
-      <div style={{maxWidth:760,margin:"0 auto"}}>{inner}</div>
+      <div className="page">{inner}</div>
       {savedTag}
       {pdfReq&&<LangPicker onPick={runPdf} onClose={()=>setPdfReq(null)}/>}
     </div>
@@ -2204,7 +2211,7 @@ function App(){
   if(view==="payments"){
     return(
       <div style={{minHeight:"100vh",background:BG,padding:"calc(34px + var(--safe-top)) 16px 40px"}}>
-        <div style={{maxWidth:760,margin:"0 auto"}}>
+        <div className="page">
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
             <BackBtn onClick={()=>setView("home")}/>
             <div style={{flex:1,minWidth:0}}>
@@ -2225,7 +2232,7 @@ function App(){
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <span style={{color:TXT,fontWeight:W.semi,fontSize:T.h2}}>Months <span style={{color:G1,fontWeight:W.med,fontSize:T.body}}>· {activeMonths.length}</span></span>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:26}}>
+          <div className="list2" style={{marginBottom:26}}>
             {activeMonths.length===0&&<div style={{color:G1,textAlign:"center",padding:"50px 0",border:`1.5px dashed ${G2}`,borderRadius:14,background:BG2}}>No months yet.<br/>Tap <b>+ Month</b> to start.</div>}
             {activeMonths.slice().reverse().map(({month,year})=>{
               const{due,paid,groups:gc,students:sc}=monthStats(month,year);
@@ -2315,7 +2322,7 @@ function App(){
   ];
   return(
     <div style={{minHeight:"100vh",background:BG,padding:"calc(20px + var(--safe-top)) 16px 40px"}}>
-      <div style={{maxWidth:760,margin:"0 auto"}}>
+      <div className="page">
         <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:22}}>
           <div style={{background:Y,borderRadius:R.md,width:46,height:46,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="grad" size={24} color={TXT} stroke={1.8}/></div>
           <div style={{flex:1,minWidth:0}}>
@@ -2355,7 +2362,7 @@ function App(){
         )}
 
         <Lbl>Sections</Lbl>
-        <div style={{display:"flex",flexDirection:"column",gap:11}}>
+        <div className="list2">
           {sections.map(c=>(
             <div key={c.title} onClick={c.go} className="tap" style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R.lg,padding:"17px 18px",display:"flex",alignItems:"center",gap:15,cursor:"pointer",boxShadow:SH1}}>
               <div style={{width:44,height:44,borderRadius:R.md,background:BG3,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={c.ico} size={22} color={TXT} stroke={1.7}/></div>
