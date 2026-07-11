@@ -101,16 +101,27 @@ const PCT_KEY="myClassesTeacherPct";
 let TEACHER_PCT=(()=>{ try{const v=parseInt(localStorage.getItem(PCT_KEY),10); return (v>=0&&v<=100)?v:55; }catch(e){ return 55; } })();
 const setTeacherPctGlobal=(v)=>{ TEACHER_PCT=Math.max(0,Math.min(100,Math.round(v||0))); try{localStorage.setItem(PCT_KEY,String(TEACHER_PCT));}catch(e){} return TEACHER_PCT; };
 
-// Colors — white/yellow/black theme
-const Y="#FFD600", YD="#E6C000", YSOFT="#FFF7CC";
-const BG="#F4F4F6", BG2="#FFFFFF", BG3="#EFEFF2";
-const TXT="#111111", G1="#6B6B72", G2="#E4E4E9";
-const GOOD="#1FAE5A", BAD="#E5484D", PART="#F5A623";
-// Elevation + shape scale
-const SH1="0 1px 2px rgba(17,17,20,.06),0 1px 3px rgba(17,17,20,.04)";
-const SH2="0 4px 16px rgba(17,17,20,.10),0 2px 6px rgba(17,17,20,.06)";
-const SHFAB="0 6px 20px rgba(230,192,0,.45),0 2px 6px rgba(17,17,20,.18)";
-const R_CARD=16, R_BTN=12;
+// ── Design tokens — white / yellow / black identity ──────────────────
+// Yellow is an ACCENT, used sparingly; warm-biased neutrals carry the
+// surfaces. Hierarchy comes from size + space, not from making everything bold.
+const Y="#FFD600", YD="#E6C000", YSOFT="#FFF7CC";            // brand accent
+const BG="#FAFAF8", BG2="#FFFFFF", BG3="#F2F2EF";            // warm grounds
+const TXT="#1A1A18", G1="#71716B", G2="#EAEAE4", G3="#9A9A94"; // warm ink + greys
+const GOOD="#1FAE5A", BAD="#E5484D", PART="#F5A623";         // semantic (dots/fills)
+const PARTTX="#B8770B";                                       // amber text, legible on white
+// Elevation — soft; most surfaces pair a hairline border with SH1
+const SH1="0 1px 2px rgba(26,26,24,.05),0 1px 3px rgba(26,26,24,.04)";
+const SH2="0 2px 10px rgba(26,26,24,.08),0 1px 3px rgba(26,26,24,.05)";
+const SHFAB="0 4px 14px rgba(26,26,24,.16),0 1px 4px rgba(26,26,24,.10)";
+// Type scale (px)
+const T={display:28,h1:22,h2:18,title:16,body:15,sub:13,label:11,micro:10};
+// Weight scale — body 400/500, emphasis 600/700; heavy reserved for hero numbers
+const W={reg:400,med:500,semi:600,bold:700,heavy:800};
+// Spacing scale (px, 4pt grid)
+const S={xs:4,sm:8,md:12,lg:16,xl:20,xxl:24,xxxl:32};
+// Radius scale
+const R={sm:10,md:12,lg:16,pill:999};
+const R_CARD=R.lg, R_BTN=R.md;   // legacy aliases
 
 // ── Performance helpers ──────────────────────────────────────────────
 const MONTHS_UZ=["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
@@ -506,6 +517,48 @@ function generateStudentPDF(groups, perf, portfolios, pid, name, groupName, mont
   doc.save(`student-${name.replace(/\s+/g,"-")}-${MONTHS[month]}-${year}.pdf`);
 }
 
+// ── Icon system ──────────────────────────────────────────────────────
+// One thin-stroke SVG set replaces the app's decorative emojis. Values are
+// the inner markup of a 24×24 viewBox; Icon supplies the stroke styling.
+const ICONS={
+  back:'<path d="m15 18-6-6 6-6"/>',
+  chevron:'<path d="m9 6 6 6-6 6"/>',
+  chevronDown:'<path d="m6 9 6 6 6-6"/>',
+  more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  close:'<path d="M18 6 6 18M6 6l12 12"/>',
+  edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  trash:'<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  trending:'<path d="M3 17l6-6 4 4 7-7"/><path d="M17 8h4v4"/>',
+  card:'<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/>',
+  file:'<path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+  wallet:'<path d="M20 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v3"/><path d="M16.5 12A1.5 1.5 0 0 0 16.5 15H21v-3Z"/>',
+  cloud:'<path d="M17.5 19a4.5 4.5 0 0 0 .5-8.98A6 6 0 0 0 6.4 8.5 4 4 0 0 0 6.5 19Z"/>',
+  download:'<path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+  upload:'<path d="M12 21V9m0 0 4 4m-4-4-4 4"/><path d="M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/>',
+  link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
+  plug:'<path d="M12 22v-5M9 8V2M15 8V2M18 8H6v3a6 6 0 0 0 12 0Z"/>',
+  grad:'<path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  cog:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  headphones:'<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M6 14a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2Z"/><path d="M18 14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2Z"/>',
+  book:'<path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3Z"/><path d="M18 20a2 2 0 0 1 2-2V6"/>',
+  speak:'<path d="M21 12a8 8 0 0 1-11.5 7.2L3 21l1.8-6.5A8 8 0 1 1 21 12Z"/>',
+  books:'<path d="M5 4h4a1 1 0 0 1 1 1v15H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="m13 7 4-1 3.5 13.5-4 1Z"/>',
+  essay:'<path d="M4 5h16M4 10h16M4 15h10"/>',
+  type:'<path d="M4 7V5h16v2M9 5v14M15 5v14M7 19h4M13 19h4"/>',
+  puzzle:'<path d="M8.5 4a2 2 0 0 1 4 0H16a1 1 0 0 1 1 1v3.5a2 2 0 0 1 0 4V16a1 1 0 0 1-1 1h-3.5a2 2 0 0 0-4 0H5a1 1 0 0 1-1-1v-3.5a2 2 0 0 0 0-4V5a1 1 0 0 1 1-1Z"/>'
+};
+const Icon=({name,size=20,stroke=1.75,color="currentColor",style={}})=>(
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={stroke}
+    strokeLinecap="round" strokeLinejoin="round" style={{display:"block",flexShrink:0,...style}}
+    dangerouslySetInnerHTML={{__html:ICONS[name]||""}}/>
+);
+
 // ── Primitives ──
 const Inp=({style={}, ...p})=>(
   <input style={{background:BG3,border:`1.5px solid transparent`,borderRadius:R_BTN,color:TXT,padding:"13px 14px",fontSize:16,outline:"none",width:"100%",WebkitAppearance:"none",...style}}
@@ -514,32 +567,32 @@ const Inp=({style={}, ...p})=>(
     {...p}/>
 );
 const YBtn=({onClick,style={},children})=>(
-  <button onClick={onClick} style={{background:Y,border:"none",borderRadius:R_BTN,color:"#000",padding:"13px 20px",cursor:"pointer",fontSize:15,fontWeight:800,minHeight:48,boxShadow:SH1,...style}}>{children}</button>
+  <button onClick={onClick} style={{background:Y,border:"none",borderRadius:R_BTN,color:TXT,padding:"13px 20px",cursor:"pointer",fontSize:T.body,fontWeight:W.bold,minHeight:48,...style}}>{children}</button>
 );
 const OutBtn=({onClick,style={},children})=>(
-  <button onClick={onClick} style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:R_BTN,color:TXT,padding:"13px 18px",cursor:"pointer",fontSize:15,fontWeight:600,minHeight:48,...style}}>{children}</button>
+  <button onClick={onClick} style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R_BTN,color:TXT,padding:"13px 18px",cursor:"pointer",fontSize:T.body,fontWeight:W.semi,minHeight:48,...style}}>{children}</button>
 );
 const BackBtn=({onClick})=>(
-  <button onClick={onClick} aria-label="Back" style={{background:BG2,border:`1.5px solid ${G2}`,color:TXT,borderRadius:"50%",width:44,height:44,minWidth:44,cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:SH1,flexShrink:0}}>←</button>
+  <button onClick={onClick} aria-label="Back" style={{background:BG2,border:`1px solid ${G2}`,color:TXT,borderRadius:"50%",width:44,height:44,minWidth:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:SH1,flexShrink:0}}><Icon name="back" size={20} stroke={1.8}/></button>
 );
-const Lbl=({children})=><div style={{color:G1,fontSize:11,fontWeight:800,letterSpacing:"0.08em",marginBottom:8,textTransform:"uppercase"}}>{children}</div>;
+const Lbl=({children})=><div style={{color:G3,fontSize:T.label,fontWeight:W.semi,letterSpacing:"0.09em",marginBottom:10,textTransform:"uppercase"}}>{children}</div>;
 // Icon button with a guaranteed 44px hit area
 const IconBtn=({onClick,label,danger,children,style={}})=>(
   <button onClick={onClick} aria-label={label} style={{
-    width:44,height:44,minWidth:44,borderRadius:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
-    background:danger?"#FDECEC":BG3,border:`1px solid ${danger?"#F6C9CA":G2}`,color:danger?BAD:TXT,...style}}>{children}</button>
+    width:44,height:44,minWidth:44,borderRadius:R.md,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:T.title,
+    background:danger?"#FDECEC":BG3,border:`1px solid ${danger?"#F6C9CA":G2}`,color:danger?BAD:G1,...style}}>{children}</button>
 );
 // Floating action button — thumb-reachable primary action
 const FAB=({onClick,label,children})=>(
   <button onClick={onClick} aria-label={label} style={{
     position:"fixed",right:"max(18px,var(--safe-right))",bottom:"calc(20px + var(--safe-bottom))",zIndex:900,
-    height:56,minWidth:56,borderRadius:28,border:"none",cursor:"pointer",background:Y,color:"#000",fontWeight:800,fontSize:16,
-    display:"flex",alignItems:"center",gap:8,padding:"0 22px",boxShadow:SHFAB}}>{children}</button>
+    height:54,minWidth:54,borderRadius:27,border:"none",cursor:"pointer",background:Y,color:TXT,fontWeight:W.bold,fontSize:T.body,
+    display:"flex",alignItems:"center",gap:8,padding:"0 20px",boxShadow:SHFAB}}>{children}</button>
 );
 const Overlay=({onClose,children,pad=24})=>(
-  <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(17,17,20,.55)",backdropFilter:"blur(2px)",WebkitBackdropFilter:"blur(2px)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,animation:"fadeIn .15s ease"}}>
-    <div onClick={e=>e.stopPropagation()} style={{background:BG2,borderRadius:"22px 22px 0 0",padding:pad,paddingBottom:`calc(${pad}px + var(--safe-bottom))`,width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,.2)",animation:"sheetUp .22s cubic-bezier(.2,.9,.3,1)"}}>
-      <div style={{width:38,height:4,background:G2,borderRadius:4,margin:"0 auto 18px"}}/>
+  <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(26,26,24,.42)",backdropFilter:"blur(2px)",WebkitBackdropFilter:"blur(2px)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:1000,animation:"fadeIn .15s ease"}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:BG2,borderRadius:"20px 20px 0 0",padding:pad,paddingBottom:`calc(${pad}px + var(--safe-bottom))`,width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -6px 30px rgba(26,26,24,.14)",animation:"sheetUp .22s cubic-bezier(.2,.9,.3,1)"}}>
+      <div style={{width:36,height:4,background:G2,borderRadius:R.pill,margin:"0 auto 18px"}}/>
       {children}
     </div>
   </div>
@@ -548,11 +601,11 @@ const Overlay=({onClose,children,pad=24})=>(
 function Confirm({title,message,confirmLabel="Delete",onConfirm,onClose}){
   return(
     <Overlay onClose={onClose}>
-      <div style={{fontWeight:800,fontSize:19,color:TXT,marginBottom:8}}>{title}</div>
-      <div style={{color:G1,fontSize:14,lineHeight:1.5,marginBottom:24}}>{message}</div>
+      <div style={{fontWeight:W.bold,fontSize:T.h2,color:TXT,marginBottom:8}}>{title}</div>
+      <div style={{color:G1,fontSize:T.body,lineHeight:1.5,marginBottom:24}}>{message}</div>
       <div style={{display:"flex",gap:10}}>
         <OutBtn onClick={onClose} style={{flex:1,textAlign:"center"}}>Cancel</OutBtn>
-        <button onClick={onConfirm} style={{flex:1,background:BAD,color:"#fff",border:"none",borderRadius:R_BTN,padding:"13px 18px",fontWeight:800,fontSize:15,minHeight:48,cursor:"pointer"}}>{confirmLabel}</button>
+        <button onClick={onConfirm} style={{flex:1,background:BAD,color:"#fff",border:"none",borderRadius:R_BTN,padding:"13px 18px",fontWeight:W.bold,fontSize:T.body,minHeight:48,cursor:"pointer"}}>{confirmLabel}</button>
       </div>
     </Overlay>
   );
@@ -561,12 +614,12 @@ function Confirm({title,message,confirmLabel="Delete",onConfirm,onClose}){
 function ActionSheet({title,subtitle,actions,onClose}){
   return(
     <Overlay onClose={onClose}>
-      <div style={{fontWeight:800,fontSize:18,color:TXT}}>{title}</div>
-      {subtitle&&<div style={{color:G1,fontSize:13,marginTop:2,marginBottom:16}}>{subtitle}</div>}
+      <div style={{fontWeight:W.bold,fontSize:T.h2,color:TXT}}>{title}</div>
+      {subtitle&&<div style={{color:G1,fontSize:T.sub,marginTop:2,marginBottom:16}}>{subtitle}</div>}
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:subtitle?0:16}}>
         {actions.map((a,i)=>(
-          <button key={i} onClick={a.onClick} style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:a.danger?"#FDECEC":BG3,border:`1px solid ${a.danger?"#F6C9CA":G2}`,borderRadius:14,color:a.danger?BAD:TXT,padding:"15px 16px",cursor:"pointer",fontSize:15,fontWeight:700,minHeight:52}}>
-            <span style={{fontSize:18}}>{a.icon}</span> {a.label}
+          <button key={i} onClick={a.onClick} style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:a.danger?"#FDECEC":BG3,border:`1px solid ${a.danger?"#F6C9CA":G2}`,borderRadius:R.md,color:a.danger?BAD:TXT,padding:"15px 16px",cursor:"pointer",fontSize:T.body,fontWeight:W.semi,minHeight:52}}>
+            <Icon name={a.icon} size={19} color={a.danger?BAD:G1}/> {a.label}
           </button>
         ))}
       </div>
@@ -578,9 +631,9 @@ function ActionSheet({title,subtitle,actions,onClose}){
 // ── Segmented control (range / view toggles) ──
 function Segmented({value,options,onChange}){
   return(
-    <div style={{display:"flex",background:BG3,borderRadius:12,padding:4,gap:2}}>
+    <div style={{display:"flex",background:BG3,borderRadius:R.md,padding:4,gap:2}}>
       {options.map(o=>(
-        <button key={o.key} onClick={()=>onChange(o.key)} style={{flex:1,textAlign:"center",fontSize:12.5,fontWeight:700,color:value===o.key?"#000":G1,padding:"9px 4px",borderRadius:9,border:"none",cursor:"pointer",background:value===o.key?Y:"transparent",boxShadow:value===o.key?SH1:"none"}}>{o.label}</button>
+        <button key={o.key} onClick={()=>onChange(o.key)} style={{flex:1,textAlign:"center",fontSize:T.sub,fontWeight:W.semi,color:value===o.key?TXT:G1,padding:"9px 4px",borderRadius:R.sm,border:"none",cursor:"pointer",background:value===o.key?Y:"transparent",boxShadow:value===o.key?SH1:"none"}}>{o.label}</button>
       ))}
     </div>
   );
@@ -823,8 +876,8 @@ function GroupView({group,monthLabel,onBack,onUpdate,portfolios={},onSavePortfol
         </Overlay>
       )}
       {menuSt&&<ActionSheet title={menuSt.name||"Student"} subtitle="Choose an action" onClose={()=>setMenuSt(null)} actions={[
-        {icon:"✏️",label:"Edit student",onClick:()=>{setEditSt(menuSt);setMenuSt(null);}},
-        {icon:"🗑",label:"Delete student",danger:true,onClick:()=>{setDelSt(menuSt);setMenuSt(null);}},
+        {icon:"edit",label:"Edit student",onClick:()=>{setEditSt(menuSt);setMenuSt(null);}},
+        {icon:"trash",label:"Delete student",danger:true,onClick:()=>{setDelSt(menuSt);setMenuSt(null);}},
       ]}/>}
       {delSt&&<Confirm title="Delete student?" message={`"${delSt.name||"This student"}" will be removed from Payments and Performance — including payment records, homework history and personal info.`} onConfirm={()=>{removeSt(delSt.id);setDelSt(null);}} onClose={()=>setDelSt(null)}/>}
       {editSt&&<StudentModal student={editSt} onSave={saveSt} onClose={()=>setEditSt(null)}/>}
@@ -923,8 +976,8 @@ function MonthView({monthIdx,year,groups,onBack,onSelectGroup,onUpdateGroup,onDe
         </Overlay>
       )}
       {menuGrp&&<ActionSheet title={menuGrp.name} subtitle={`${menuGrp.students.length} student${menuGrp.students.length!==1?"s":""}`} onClose={()=>setMenuGrp(null)} actions={[
-        {icon:"📂",label:"Open group",onClick:()=>{onSelectGroup(menuGrp.id);setMenuGrp(null);}},
-        {icon:"🗑",label:"Delete group",danger:true,onClick:()=>{setDelGrp(menuGrp);setMenuGrp(null);}},
+        {icon:"folder",label:"Open group",onClick:()=>{onSelectGroup(menuGrp.id);setMenuGrp(null);}},
+        {icon:"trash",label:"Delete group",danger:true,onClick:()=>{setDelGrp(menuGrp);setMenuGrp(null);}},
       ]}/>}
       {delGrp&&<Confirm title="Delete group?" message={`"${delGrp.name}" and its ${delGrp.students.length} student${delGrp.students.length!==1?"s":""} will be permanently removed.`} onConfirm={()=>{onDeleteGroup(delGrp.id);setDelGrp(null);}} onClose={()=>setDelGrp(null)}/>}
     </div>
@@ -1105,8 +1158,8 @@ function NewcomersView({newcomers,groups,onBack,onAdd,onUpdate,onDelete}){
       {adding&&<NewcomerModal groupNames={groupNames} onSave={n=>{onAdd(n);setAdding(false);}} onClose={()=>setAdding(false)}/>}
       {editItem&&<NewcomerModal newcomer={editItem} groupNames={groupNames} onSave={n=>{onUpdate(n);setEditItem(null);}} onClose={()=>setEditItem(null)}/>}
       {menuItem&&<ActionSheet title={menuItem.name||"Newcomer"} subtitle="Choose an action" onClose={()=>setMenuItem(null)} actions={[
-        {icon:"✏️",label:"Edit newcomer",onClick:()=>{setEditItem(menuItem);setMenuItem(null);}},
-        {icon:"🗑",label:"Delete newcomer",danger:true,onClick:()=>{setDelItem(menuItem);setMenuItem(null);}},
+        {icon:"edit",label:"Edit newcomer",onClick:()=>{setEditItem(menuItem);setMenuItem(null);}},
+        {icon:"trash",label:"Delete newcomer",danger:true,onClick:()=>{setDelItem(menuItem);setMenuItem(null);}},
       ]}/>}
       {delItem&&<Confirm title="Delete newcomer?" message={`"${delItem.name||"This entry"}" will be permanently removed.`} onConfirm={()=>{onDelete(delItem.id);setDelItem(null);}} onClose={()=>setDelItem(null)}/>}
     </div>
@@ -2237,87 +2290,86 @@ function App(){
   const peopleCount=Object.keys(rosterByPid(groups)).length;
   const enterPerformance=()=>{ if(perfMonth==null){setPerfMonth(latest.month);setPerfYear(latest.year);} setView("performance"); };
   const sections=[
-    {ico:"💳",bg:YSOFT,title:"Payments",sub:`Fees & who paid · tap 🗂️ for a student's portfolio · ${peopleCount} students`,go:()=>setView("payments")},
-    {ico:"📈",bg:"#E3F5EA",title:"Performance",sub:"Typed homework tracking · reports & charts",go:enterPerformance},
+    {ico:"card",title:"Payments",sub:`Fees & who paid · ${peopleCount} students`,go:()=>setView("payments")},
+    {ico:"trending",title:"Performance",sub:"Typed homework tracking · reports & charts",go:enterPerformance},
   ];
   return(
     <div style={{minHeight:"100vh",background:BG,padding:"calc(20px + var(--safe-top)) 16px 40px"}}>
       <div style={{maxWidth:760,margin:"0 auto"}}>
         <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:22}}>
-          <div style={{background:Y,borderRadius:14,width:52,height:52,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,boxShadow:SH1,flexShrink:0}}>🎓</div>
+          <div style={{background:Y,borderRadius:R.md,width:46,height:46,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="grad" size={24} color={TXT} stroke={1.8}/></div>
           <div style={{flex:1,minWidth:0}}>
-            <h1 style={{margin:0,color:TXT,fontSize:24,fontWeight:900,letterSpacing:"-0.5px"}}>My Classes</h1>
-            <p style={{margin:"3px 0 0",color:G1,fontSize:13}}>Educational Center</p>
+            <h1 style={{margin:0,color:TXT,fontSize:T.h1,fontWeight:W.bold,letterSpacing:"-0.3px"}}>My Classes</h1>
+            <p style={{margin:"2px 0 0",color:G1,fontSize:T.sub,fontWeight:W.med}}>Educational Center</p>
           </div>
-          <IconBtn onClick={()=>setMenuOpen(true)} label="Menu & backup" style={{background:BG2,boxShadow:SH1,fontSize:22,fontWeight:800}}>⋯</IconBtn>
+          <IconBtn onClick={()=>setMenuOpen(true)} label="Menu & backup" style={{background:BG2,border:`1px solid ${G2}`,boxShadow:SH1}}><Icon name="more" size={20} color={G1}/></IconBtn>
         </div>
 
-        <div style={{background:"#111",borderRadius:20,padding:"22px 24px",marginBottom:24,boxShadow:SH2,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:-44,right:-34,width:150,height:150,borderRadius:"50%",background:"rgba(255,214,0,.13)"}}/>
+        <div style={{background:TXT,borderRadius:18,padding:"22px 22px",marginBottom:22,boxShadow:SH2,position:"relative",overflow:"hidden"}}>
           <div style={{position:"relative"}}>
-            <div style={{color:"#ffffff99",fontSize:11,fontWeight:800,letterSpacing:"0.1em",marginBottom:8}}>YOUR INCOME · {MONTHS[latest.month].toUpperCase()} {latest.year}</div>
-            <div style={{color:Y,fontSize:33,fontWeight:900,letterSpacing:"-1px",marginBottom:4}}>{fmt(heroIncome)}</div>
-            <div onClick={()=>setMenuOpen(true)} style={{color:"#ffffff88",fontSize:12,marginBottom:18,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:5}}>{TEACHER_PCT}% of collected payments <span style={{color:Y,fontWeight:700}}>· edit ✎</span></div>
+            <div style={{color:"#ffffff7a",fontSize:T.label,fontWeight:W.semi,letterSpacing:"0.09em",marginBottom:10}}>YOUR INCOME · {MONTHS[latest.month].toUpperCase()} {latest.year}</div>
+            <div style={{color:Y,fontSize:30,fontWeight:W.heavy,letterSpacing:"-0.8px",marginBottom:6}}>{fmt(heroIncome)}</div>
+            <div onClick={()=>setMenuOpen(true)} style={{color:"#ffffff85",fontSize:T.sub,marginBottom:20,cursor:"pointer",fontWeight:W.med,display:"inline-flex",alignItems:"center",gap:4}}>{TEACHER_PCT}% of collected payments <span style={{color:Y,fontWeight:W.semi}}>· edit</span></div>
             <div style={{display:"flex",gap:24,flexWrap:"wrap"}}>
               {[["BILLED",fmt(hero.due)],["COLLECTED",fmt(hero.paid)],[`CENTER (${100-TEACHER_PCT}%)`,fmt(hero.paid*((100-TEACHER_PCT)/100))]].map(([l,v])=>(
-                <div key={l}><div style={{color:"#ffffff77",fontSize:10,fontWeight:700,letterSpacing:"0.05em"}}>{l}</div><div style={{color:"#fff",fontWeight:800,fontSize:15,marginTop:3}}>{v}</div></div>
+                <div key={l}><div style={{color:"#ffffff66",fontSize:T.micro,fontWeight:W.semi,letterSpacing:"0.05em"}}>{l}</div><div style={{color:"#fff",fontWeight:W.semi,fontSize:T.body,marginTop:4}}>{v}</div></div>
               ))}
             </div>
-            <div style={{marginTop:16,height:6,background:"rgba(255,255,255,.15)",borderRadius:4}}>
-              <div style={{height:"100%",borderRadius:4,background:Y,width:`${heroPct}%`,transition:"width .4s"}}/>
+            <div style={{marginTop:18,height:5,background:"rgba(255,255,255,.14)",borderRadius:R.pill}}>
+              <div style={{height:"100%",borderRadius:R.pill,background:Y,width:`${heroPct}%`,transition:"width .4s"}}/>
             </div>
-            <div style={{color:"#ffffff77",fontSize:11,fontWeight:700,marginTop:6,textAlign:"right"}}>{heroPct}% collected</div>
+            <div style={{color:"#ffffff66",fontSize:T.label,fontWeight:W.semi,marginTop:7,textAlign:"right"}}>{heroPct}% collected</div>
           </div>
         </div>
 
         {fileState==="reconnect"&&!bannerHidden&&(
-          <div style={{background:YSOFT,border:`1.5px solid ${YD}`,borderRadius:14,padding:"12px 14px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
-            <span style={{fontSize:20}}>🔌</span>
+          <div style={{background:YSOFT,border:`1px solid ${YD}`,borderRadius:R.md,padding:"12px 14px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
+            <Icon name="plug" size={20} color={YD}/>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{color:"#5a4a00",fontWeight:800,fontSize:13.5}}>Reconnect your save file</div>
-              <div style={{color:"#8a7400",fontSize:11.5,marginTop:1}}>Tap to keep saving to {fileName||"your file"}</div>
+              <div style={{color:"#5a4a00",fontWeight:W.bold,fontSize:T.sub}}>Reconnect your save file</div>
+              <div style={{color:"#8a7400",fontSize:T.micro,marginTop:1}}>Tap to keep saving to {fileName||"your file"}</div>
             </div>
-            <YBtn onClick={reconnectFile} style={{padding:"9px 14px",minHeight:40,fontSize:13.5}}>Reconnect</YBtn>
-            <IconBtn onClick={()=>setBannerHidden(true)} label="Dismiss" style={{width:36,height:36,minWidth:36,background:"transparent",border:"none",color:"#8a7400"}}>✕</IconBtn>
+            <YBtn onClick={reconnectFile} style={{padding:"9px 14px",minHeight:40,fontSize:T.sub}}>Reconnect</YBtn>
+            <IconBtn onClick={()=>setBannerHidden(true)} label="Dismiss" style={{width:36,height:36,minWidth:36,background:"transparent",border:"none",color:"#8a7400"}}><Icon name="close" size={18}/></IconBtn>
           </div>
         )}
 
         <Lbl>Sections</Lbl>
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{display:"flex",flexDirection:"column",gap:11}}>
           {sections.map(c=>(
-            <div key={c.title} onClick={c.go} className="tap" style={{background:BG2,border:`1.5px solid ${G2}`,borderRadius:16,padding:20,display:"flex",alignItems:"center",gap:16,cursor:"pointer",boxShadow:SH1}}>
-              <div style={{width:56,height:56,borderRadius:16,background:c.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>{c.ico}</div>
+            <div key={c.title} onClick={c.go} className="tap" style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R.lg,padding:"17px 18px",display:"flex",alignItems:"center",gap:15,cursor:"pointer",boxShadow:SH1}}>
+              <div style={{width:44,height:44,borderRadius:R.md,background:BG3,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={c.ico} size={22} color={TXT} stroke={1.7}/></div>
               <div style={{minWidth:0,flex:1}}>
-                <div style={{fontWeight:800,fontSize:18,color:TXT}}>{c.title}</div>
-                <div style={{color:G1,fontSize:12.5,marginTop:3,lineHeight:1.4}}>{c.sub}</div>
+                <div style={{fontWeight:W.semi,fontSize:T.title,color:TXT}}>{c.title}</div>
+                <div style={{color:G1,fontSize:T.sub,marginTop:2,lineHeight:1.4,fontWeight:W.med}}>{c.sub}</div>
               </div>
-              <div style={{color:G1,fontSize:22,flexShrink:0}}>›</div>
+              <Icon name="chevron" size={20} color={G3} style={{flexShrink:0}}/>
             </div>
           ))}
         </div>
 
-        <div style={{background:YSOFT,border:`1px solid ${YD}`,borderRadius:14,padding:"13px 15px",marginTop:16,display:"flex",gap:10,alignItems:"flex-start"}}>
-          <span style={{fontSize:17}}>🔗</span>
-          <div style={{fontSize:12.5,color:"#5a4a00",lineHeight:1.5}}>Open a student's portfolio with the <b>🗂️ button</b> next to their name in <b>Payments → group</b>. Both sections share the same students — add or delete once, it updates everywhere.</div>
+        <div style={{background:BG2,border:`1px solid ${G2}`,borderRadius:R.md,padding:"13px 14px",marginTop:14,display:"flex",gap:11,alignItems:"flex-start"}}>
+          <Icon name="link" size={18} color={YD} style={{marginTop:1}}/>
+          <div style={{fontSize:T.sub,color:G1,lineHeight:1.5,fontWeight:W.med}}>Open a student's portfolio with the <b style={{color:TXT}}>folder button</b> next to their name in <b style={{color:TXT}}>Payments → group</b>. Both sections share the same students — add or delete once, it updates everywhere.</div>
         </div>
       </div>
 
-      {saved&&<div style={{position:"fixed",bottom:"calc(26px + var(--safe-bottom))",left:"max(18px,var(--safe-left))",background:"#111",color:Y,borderRadius:20,padding:"7px 15px",fontSize:13,fontWeight:700,boxShadow:SH2,zIndex:901}}>✓ Saved</div>}
+      {saved&&<div style={{position:"fixed",bottom:"calc(26px + var(--safe-bottom))",left:"max(18px,var(--safe-left))",background:TXT,color:"#fff",borderRadius:R.pill,padding:"8px 15px",fontSize:T.sub,fontWeight:W.semi,boxShadow:SH2,zIndex:901,display:"inline-flex",alignItems:"center",gap:6}}><Icon name="check" size={15} color={Y}/> Saved</div>}
 
       {menuOpen&&(
         <Overlay onClose={()=>setMenuOpen(false)}>
-          <div style={{fontWeight:800,fontSize:19,color:TXT,marginBottom:18}}>Settings &amp; Backup</div>
+          <div style={{fontWeight:W.bold,fontSize:T.h2,color:TXT,marginBottom:18}}>Settings &amp; Backup</div>
 
           {/* Teacher's monthly share */}
-          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:R.md,padding:"14px 16px",marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <div>
-                <div style={{color:TXT,fontWeight:800,fontSize:15}}>💰 Teacher's monthly share</div>
-                <div style={{color:G1,fontSize:12,marginTop:2}}>Your cut of every payment collected</div>
+                <div style={{color:TXT,fontWeight:W.semi,fontSize:T.title,display:"flex",alignItems:"center",gap:8}}><Icon name="wallet" size={18} color={G1}/> Teacher's monthly share</div>
+                <div style={{color:G1,fontSize:T.sub,marginTop:2}}>Your cut of every payment collected</div>
               </div>
               <div style={{display:"flex",alignItems:"baseline",gap:2}}>
-                <span style={{color:TXT,fontWeight:900,fontSize:26,letterSpacing:"-1px"}}>{teacherPct}</span>
-                <span style={{color:G1,fontWeight:800,fontSize:15}}>%</span>
+                <span style={{color:TXT,fontWeight:W.heavy,fontSize:26,letterSpacing:"-1px"}}>{teacherPct}</span>
+                <span style={{color:G1,fontWeight:W.semi,fontSize:T.title}}>%</span>
               </div>
             </div>
             <input type="range" min="0" max="100" step="1" value={teacherPct} onChange={e=>changePct(Number(e.target.value))}
@@ -2333,8 +2385,8 @@ function App(){
           </div>
 
           {/* Account & sync across devices */}
-          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
-            <div style={{color:TXT,fontWeight:800,fontSize:15,marginBottom:2}}>☁️ Account &amp; sync</div>
+          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:R.md,padding:"14px 16px",marginBottom:16}}>
+            <div style={{color:TXT,fontWeight:W.semi,fontSize:T.title,marginBottom:2,display:"flex",alignItems:"center",gap:8}}><Icon name="cloud" size={18} color={G1}/> Account &amp; sync</div>
             <div style={{color:G1,fontSize:12,marginBottom:12}}>Sign in to keep the same data on your computer and phone</div>
             {!SYNC&&(
               <div style={{color:G1,fontSize:13,lineHeight:1.5,background:BG2,border:`1px solid ${G2}`,borderRadius:10,padding:"11px 13px"}}>
@@ -2356,10 +2408,10 @@ function App(){
             {SYNC&&session&&(
               <>
                 <div style={{display:"flex",alignItems:"center",gap:8,fontSize:13.5,marginBottom:8}}>
-                  {syncState==="syncing"&&<span style={{color:PART,fontWeight:800}}>⟳ Syncing…</span>}
-                  {syncState==="synced"&&<span style={{color:GOOD,fontWeight:800}}>✓ Synced across your devices</span>}
-                  {syncState==="error"&&<span style={{color:BAD,fontWeight:800}}>⚠ Sync error — will retry</span>}
-                  {syncState==="off"&&<span style={{color:G1,fontWeight:800}}>Connected</span>}
+                  {syncState==="syncing"&&<span style={{color:PARTTX,fontWeight:W.semi}}>Syncing…</span>}
+                  {syncState==="synced"&&<span style={{color:GOOD,fontWeight:W.semi,display:"inline-flex",alignItems:"center",gap:6}}><Icon name="check" size={15} color={GOOD}/> Synced across your devices</span>}
+                  {syncState==="error"&&<span style={{color:BAD,fontWeight:W.semi}}>Sync error — will retry</span>}
+                  {syncState==="off"&&<span style={{color:G1,fontWeight:W.semi}}>Connected</span>}
                 </div>
                 <div style={{color:G1,fontSize:12.5,marginBottom:10}}>Signed in as <b style={{color:TXT}}>{session.user&&session.user.email}</b></div>
                 <div style={{display:"flex",gap:8}}>
@@ -2371,8 +2423,8 @@ function App(){
           </div>
 
           {/* Auto-save to a file on this computer */}
-          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
-            <div style={{color:TXT,fontWeight:800,fontSize:15,marginBottom:2}}>💾 Auto-save to a file</div>
+          <div style={{background:BG3,border:`1px solid ${G2}`,borderRadius:R.md,padding:"14px 16px",marginBottom:16}}>
+            <div style={{color:TXT,fontWeight:W.semi,fontSize:T.title,marginBottom:2,display:"flex",alignItems:"center",gap:8}}><Icon name="file" size={18} color={G1}/> Auto-save to a file</div>
             <div style={{color:G1,fontSize:12,marginBottom:12}}>Save every change straight to a file on this computer</div>
             {fileState==="unsupported"&&(
               <div style={{color:G1,fontSize:13,lineHeight:1.5,background:BG2,border:`1px solid ${G2}`,borderRadius:10,padding:"11px 13px"}}>
@@ -2381,46 +2433,46 @@ function App(){
             )}
             {fileState==="off"&&(
               <>
-                <YBtn onClick={linkFile} style={{width:"100%",textAlign:"center",marginBottom:10}}>🔗 Link a save file</YBtn>
+                <YBtn onClick={linkFile} style={{width:"100%",textAlign:"center",marginBottom:10}}>Link a save file</YBtn>
                 <div style={{color:G1,fontSize:12,lineHeight:1.5,marginBottom:installEvt?12:0}}>Pick a file once (e.g. in Documents). After that every change writes to it automatically and the app loads from it when you open it.</div>
                 {installEvt&&(
                   <div style={{background:YSOFT,border:`1px solid ${YD}`,borderRadius:10,padding:"11px 13px"}}>
-                    <div style={{fontSize:12.5,color:"#5a4a00",lineHeight:1.5,marginBottom:9}}>Tip: <b>install the app</b> once, then link your file and choose <b>"allow on every visit"</b> — after that it opens and saves with no clicks.</div>
-                    <OutBtn onClick={doInstall} style={{width:"100%",textAlign:"center",background:BG2}}>⬇ Install app</OutBtn>
+                    <div style={{fontSize:T.sub,color:"#5a4a00",lineHeight:1.5,marginBottom:9}}>Tip: <b>install the app</b> once, then link your file and choose <b>"allow on every visit"</b> — after that it opens and saves with no clicks.</div>
+                    <OutBtn onClick={doInstall} style={{width:"100%",textAlign:"center",background:BG2}}>Install app</OutBtn>
                   </div>
                 )}
               </>
             )}
             {fileState==="reconnect"&&(
               <>
-                <div style={{color:"#5a4a00",fontSize:12.5,lineHeight:1.5,marginBottom:10,background:YSOFT,border:`1px solid ${YD}`,borderRadius:10,padding:"10px 12px"}}>Your file <b>{fileName||"my-classes.json"}</b> is linked. Tap below to reconnect it for this session.</div>
-                <YBtn onClick={reconnectFile} style={{width:"100%",textAlign:"center",marginBottom:8}}>🔌 Reconnect save file</YBtn>
+                <div style={{color:"#5a4a00",fontSize:T.sub,lineHeight:1.5,marginBottom:10,background:YSOFT,border:`1px solid ${YD}`,borderRadius:R.sm,padding:"10px 12px"}}>Your file <b>{fileName||"my-classes.json"}</b> is linked. Tap below to reconnect it for this session.</div>
+                <YBtn onClick={reconnectFile} style={{width:"100%",textAlign:"center",marginBottom:8}}>Reconnect save file</YBtn>
                 <OutBtn onClick={unlinkFile} style={{width:"100%",textAlign:"center"}}>Unlink</OutBtn>
               </>
             )}
             {fileState==="connected"&&(
               <>
-                <div style={{display:"flex",alignItems:"center",gap:8,color:GOOD,fontWeight:800,fontSize:13.5,marginBottom:10}}>
-                  <span>✓</span> Auto-saving to <span style={{color:TXT}}>{fileName||"my-classes.json"}</span>
+                <div style={{display:"flex",alignItems:"center",gap:8,color:GOOD,fontWeight:W.semi,fontSize:T.sub,marginBottom:10}}>
+                  <Icon name="check" size={15} color={GOOD}/> Auto-saving to <span style={{color:TXT}}>{fileName||"my-classes.json"}</span>
                 </div>
                 <div style={{display:"flex",gap:8}}>
                   <OutBtn onClick={saveNow} style={{flex:1,textAlign:"center"}}>Save now</OutBtn>
                   <OutBtn onClick={unlinkFile} style={{flex:1,textAlign:"center"}}>Unlink</OutBtn>
                 </div>
-                {installEvt&&<OutBtn onClick={doInstall} style={{width:"100%",textAlign:"center",marginTop:8,background:BG2}}>⬇ Install app (for click-free opening)</OutBtn>}
+                {installEvt&&<OutBtn onClick={doInstall} style={{width:"100%",textAlign:"center",marginTop:8,background:BG2}}>Install app (for click-free opening)</OutBtn>}
               </>
             )}
           </div>
 
-          <button onClick={doBackup} style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:BG3,border:`1px solid ${G2}`,borderRadius:14,color:TXT,padding:"15px 16px",cursor:"pointer",fontSize:15,fontWeight:700,marginBottom:10}}>
-            <span style={{fontSize:20}}>⬇</span> Back up to file
+          <button onClick={doBackup} style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:BG3,border:`1px solid ${G2}`,borderRadius:R.md,color:TXT,padding:"15px 16px",cursor:"pointer",fontSize:T.body,fontWeight:W.semi,marginBottom:10}}>
+            <Icon name="download" size={19} color={G1}/> Back up to file
           </button>
-          <label style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:BG3,border:`1px solid ${G2}`,borderRadius:14,color:TXT,padding:"15px 16px",cursor:"pointer",fontSize:15,fontWeight:700}}>
-            <span style={{fontSize:20}}>⬆</span> Restore from file
+          <label style={{width:"100%",display:"flex",alignItems:"center",gap:12,background:BG3,border:`1px solid ${G2}`,borderRadius:R.md,color:TXT,padding:"15px 16px",cursor:"pointer",fontSize:T.body,fontWeight:W.semi}}>
+            <Icon name="upload" size={19} color={G1}/> Restore from file
             <input type="file" accept=".json" onChange={doRestore} style={{display:"none"}}/>
           </label>
-          {restoreMsg&&<div style={{color:restoreMsg.startsWith("✓")?GOOD:BAD,fontSize:14,fontWeight:700,marginTop:12}}>{restoreMsg}</div>}
-          <div style={{color:G1,fontSize:12.5,marginTop:16,lineHeight:1.55}}>Your records are saved automatically on this device. Back up regularly so nothing is lost if your browser data is cleared. Backups now include performance & portfolio too.</div>
+          {restoreMsg&&<div style={{color:restoreMsg.startsWith("✓")?GOOD:BAD,fontSize:T.body,fontWeight:W.semi,marginTop:12}}>{restoreMsg}</div>}
+          <div style={{color:G1,fontSize:T.sub,marginTop:16,lineHeight:1.55}}>Your records are saved automatically on this device. Back up regularly so nothing is lost if your browser data is cleared. Backups now include performance & portfolio too.</div>
           <OutBtn onClick={()=>setMenuOpen(false)} style={{width:"100%",textAlign:"center",marginTop:18}}>Close</OutBtn>
         </Overlay>
       )}
