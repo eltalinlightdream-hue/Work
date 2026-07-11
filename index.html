@@ -148,12 +148,18 @@ function recStat(rec){
 const missedTypes=(rec)=>(rec&&typeof rec==="object")?Object.keys(rec).filter(k=>!rec[k]):[];
 const scheduleFromName=(name="")=>/odd/i.test(name)?"odd":"even";
 const iso=(y,m,d)=>`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-// Even/odd calendar-day dates for a given month
+// Weekday-based lesson dates for a given month.
+// Odd groups meet Mon/Wed/Fri, even groups meet Tue/Thu/Sat; Sunday is never a class day.
 function parityDatesForMonth(year,monthIdx,parity){
   const days=new Date(year,monthIdx+1,0).getDate();
   const want=parity==="even";
   const out=[];
-  for(let d=1;d<=days;d++){ if(want===(d%2===0)) out.push(iso(year,monthIdx,d)); }
+  for(let d=1;d<=days;d++){
+    const wd=new Date(year,monthIdx,d).getDay(); // 0=Sun..6=Sat
+    if(wd===0) continue;                          // no Sunday classes
+    const isEvenDay=wd%2===0;                      // Tue/Thu/Sat
+    if(want===isEvenDay) out.push(iso(year,monthIdx,d));
+  }
   return out;
 }
 // Completion % — partial counts as half
